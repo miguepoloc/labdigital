@@ -58,6 +58,12 @@ services:
     depends_on: { db: { condition: service_healthy }, api: { condition: service_started } }
     environment: *backend-env
     command: ${WORKER_COMMAND:-python -m backend.entrypoints.worker.main}
+    # El HEALTHCHECK de la imagen consulta la API HTTP; el worker no la sirve. Vivo = el proceso del worker sigue corriendo.
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qa 'backend.entrypoints.worker' /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     mem_limit: 512m
 
   web:
