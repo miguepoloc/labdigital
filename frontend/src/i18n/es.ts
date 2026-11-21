@@ -1,4 +1,6 @@
 import { landing } from './es.landing'
+import { projects } from './es.projects'
+
 /**
  * Textos en español. Para añadir inglés: crear `en.ts` con la misma forma (`satisfies Messages`)
  * y elegir el diccionario en `i18n/index.ts`.
@@ -185,6 +187,7 @@ export const es = {
     back: 'Volver al inicio',
   },
   landing,
+  projects,
   common: {
     close: 'Cerrar',
     cancel: 'Cancelar',

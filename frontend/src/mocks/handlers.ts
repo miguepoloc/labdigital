@@ -1,3 +1,4 @@
+import { projectHandlers } from './handlers.projects'
 import { delay, http, HttpResponse, type HttpResponseResolver } from 'msw'
 import { config } from '@/config'
 import type {
@@ -71,6 +72,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const RATE_LIMITED_EMAIL = 'limite@unimagdalena.edu.co'
 
 export const handlers = [
+  ...projectHandlers,
   http.get(`${A}/health`, () => HttpResponse.json({ ok: true })),
 
   http.post(

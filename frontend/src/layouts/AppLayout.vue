@@ -10,7 +10,7 @@ const router = useRouter()
 
 const nav = computed<NavItem[]>(() => [
   { label: t('nav.home'), to: { name: 'home' } },
-  { label: t('nav.projects'), soon: true },
+  { label: t('nav.projects'), to: { name: 'projects' } },
   { label: t('nav.courses'), soon: true },
   { label: t('nav.profile'), to: { name: 'profile' } },
   { label: t('nav.sessions'), to: { name: 'sessions' } },

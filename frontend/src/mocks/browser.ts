@@ -2,11 +2,14 @@ import { setupWorker } from 'msw/browser'
 import { config } from '@/config'
 import * as mockDb from './db'
 import { handlers, setMockLatency } from './handlers'
+import { enableProjectsPersistence, setProjectsMockLatency } from './handlers.projects'
 
 /** Arranca la API simulada en el navegador (sólo `npm run dev` con VITE_API_MOCK distinto de "0"). */
 export async function startMockApi(): Promise<void> {
   mockDb.enablePersistence()
   setMockLatency(350)
+  enableProjectsPersistence()
+  setProjectsMockLatency(350)
   const worker = setupWorker(...handlers)
   await worker.start({
     serviceWorker: { url: `${config.basePath}mockServiceWorker.js` },

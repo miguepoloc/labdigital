@@ -1,6 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 import type { MessageKey } from '@/i18n'
 import LandingPage from '@/pages/LandingPage.vue'
+import { projectRoutes } from './routes.projects'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -83,6 +84,7 @@ export const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  ...projectRoutes,
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
