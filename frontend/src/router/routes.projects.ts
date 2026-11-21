@@ -28,8 +28,7 @@ export const projectRoutes: RouteRecordRaw[] = [
   {
     path: '/app/fpga/:projectId?',
     name: 'fpga',
-    // Envoltorio FPGA: llega en LD-9.
-    component: () => import('@/pages/NotFoundPage.vue'),
+    component: () => import('@/pages/app/fpga/FpgaWrapperPage.vue'),
     meta: { requiresAuth: true, title: 'projects.fpga.title' },
   },
 ]
