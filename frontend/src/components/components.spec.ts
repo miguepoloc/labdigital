@@ -1,4 +1,6 @@
 import { mount } from '@vue/test-utils'
+import { createSSRApp, h, nextTick } from 'vue'
+import { renderToString } from 'vue/server-renderer'
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import LdAlert from './LdAlert.vue'
@@ -34,6 +36,15 @@ describe('componentes base', () => {
     const w = mount(LdButton, { props: { loading: true }, slots: { default: 'Enviar' } })
     expect(w.find('button').attributes('disabled')).toBeDefined()
     expect(w.find('button').attributes('aria-busy')).toBe('true')
+  })
+
+  it('LdButton submit: deshabilitado en el HTML prerenderizado y habilitado al hidratar', async () => {
+    const app = createSSRApp({ render: () => h(LdButton, { type: 'submit' }, () => 'Entrar') })
+    const html = await renderToString(app)
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled/)
+    const w = mount(LdButton, { props: { type: 'submit' }, slots: { default: 'Entrar' } })
+    await nextTick()
+    expect(w.find('button').attributes('disabled')).toBeUndefined()
   })
 
   it('LdButton con `to` renderiza un enlace con href (y `href` externo tal cual)', async () => {

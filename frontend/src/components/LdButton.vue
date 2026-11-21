@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import LdSpinner from './LdSpinner.vue'
 
@@ -21,7 +21,16 @@ const props = withDefaults(
 )
 
 const tag = computed(() => (props.to ? RouterLink : props.href ? 'a' : 'button'))
-const isDisabled = computed(() => props.disabled || props.loading)
+/**
+ * Las páginas de cuenta se prerenderizan: antes de hidratar, un «Enviar» haría el envío nativo del formulario
+ * (GET a la misma URL con los campos — correo y contraseña — en la query). El botón de envío queda
+ * deshabilitado en el HTML prerenderizado y se habilita al montar (y con él el envío implícito con Enter).
+ */
+const mounted = ref(false)
+onMounted(() => (mounted.value = true))
+const isDisabled = computed(
+  () => props.disabled || props.loading || (props.type === 'submit' && !mounted.value),
+)
 </script>
 
 <template>
