@@ -1,6 +1,7 @@
 """Capa de aplicación de `identity.sessions`: emisión, rotación con detección de reuso y
 revocación de familias de refresh tokens."""
 
+import hmac
 import typing
 import uuid
 
@@ -92,7 +93,7 @@ def revoke_by_refresh_token(
         if found is None:
             return None
         session, presented = found
-        if presented.token_hash != value_objects.hash_secret(opaque.secret):
+        if not hmac.compare_digest(presented.token_hash, value_objects.hash_secret(opaque.secret)):
             return None
         if session.revoke(reason):
             repo.update(session)
