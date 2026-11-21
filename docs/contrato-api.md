@@ -94,6 +94,24 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
 (+ `Retry-After`), `csrf_rejected`, `token_invalid`, `version_conflict`, `deadline_passed`, `forbidden`, `not_found`,
 `validation_error`, `payload_too_large`.
 
+### 6.1 Precisiones (acordadas tras LD-7)
+
+- **401 = sólo sesión ausente/caducada**, con código `unauthenticated` (el cliente lo usa para renovar). Credenciales
+  equivocadas en `POST /me/password` ⇒ **400** `invalid_current_password` (nunca 401). Login fallido sigue 401
+  `invalid_credentials` (no dispara renovación: el cliente lo excluye).
+- **422 `validation_error`**: `details.fields = { "<campo>": "<mensaje en español>" }`.
+- `Session = { id, user_agent, ip, created_at, last_used_at, current: bool }`.
+- `PATCH /me` devuelve `Me`.
+- `next` es siempre la ruta completa con prefijo (`/labdigital/app/...`, `/labdigital/fpga/...`).
+- **Revisión de autosave** (tras LD-3): `Project` y la respuesta de `PUT /projects/{id}/autosave` incluyen `revision`
+  (entero que sube en CADA guardado, también cuando el autosave sobrescribe la versión abierta). El autosave envía
+  `{content, base_version, base_revision}`; si `base_revision` ≠ la actual ⇒ 409 `version_conflict` con
+  `details: {current_version, current_revision}`.
+- **Refresh concurrente**: reusar el refresh recién rotado dentro de **10 s** no revoca la familia (devuelve 204 con
+  cookies nuevas de la misma familia); fuera de esa ventana sí (robo). El frontend además serializa la renovación entre
+  pestañas con `navigator.locks.request("ld-refresh", …)` (si no existe, el candado por pestaña).
+- `POST /projects/{id}/versions` acepta cuerpo vacío.
+
 ## 7. API de integración del módulo FPGA (`window.JGFPGA`, PR a mcangen/JG-FPGA)
 
 ```js
@@ -109,6 +127,16 @@ window.JGFPGA = {
 ```
 Se dispara `window.parent.postMessage({ type: "jgfpga:ready", version: "1" }, location.origin)` al cargar.
 El envoltorio de LabDigital (mismo origen) usa sólo esta API.
+
+Precisiones (implementación en `mcangen/JG-FPGA` rama `feat/api-integracion`, `docs/EMBED.md`):
+- `on("change", fn)`: `fn(content)` recibe el proyecto; se emite 1 s después de la última edición y sólo si cambió.
+  `"ready"` también se entrega a quien se suscribe tarde. Extra: `readOnly()` → boolean.
+- `loadProject` **lanza** si `format`/`version`/`files` no son válidos, devuelve la lista de archivos omitidos y no emite `change`.
+- Embebido, JG FPGA guarda su caché en claves propias (`basys-project-embed`), así que **el envoltorio debe llamar siempre
+  a `loadProject` al recibir `ready`** (si no, se vería la última caché, editable).
+- `getLastBitstream()` devuelve el `.bit` más reciente **de ese navegador**, no necesariamente del proyecto abierto:
+  el envoltorio debe mostrar su nombre y fecha para que el estudiante confirme antes de adjuntarlo.
+- Errores de red/HTTP en `getLastBitstream`/`getReportDocx` se lanzan (no devuelven `null`): capturarlos.
 
 ## 8. Convenciones de repo
 
