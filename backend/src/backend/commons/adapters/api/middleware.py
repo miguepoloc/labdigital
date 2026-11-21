@@ -2,7 +2,7 @@
 
 - `RequestLoggingMiddleware`: fija el `request_id` que lee `logs.JsonFormatter`.
 - `CsrfMiddleware`: toda petición que no sea GET/HEAD/OPTIONS debe traer
-  `X-Requested-With: labdigital` y un `Origin` del mismo host; si no ⇒ 403 `csrf_rejected`.
+  `X-Requested-With: labdigital` y un `Origin` igual al origen público (esquema+host+puerto); si no ⇒ 403 `csrf_rejected`.
   Complementa a `SameSite` de las cookies (defensa en profundidad).
 - `BodySizeLimitMiddleware`: rechaza con 413 `payload_too_large` cuerpos cuyo
   `Content-Length` supera el máximo (nginx aplica además `client_max_body_size`).
@@ -39,15 +39,20 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def is_same_origin(*, origin: str | None, host: str | None, public_origin: str) -> bool:
-    """`Origin` aceptado si coincide con el origen público configurado o si su host[:puerto]
-    es exactamente la cabecera `Host` de la petición (nginx la reenvía con `$host`)."""
+def is_same_origin(*, origin: str | None, public_origin: str) -> bool:
+    """`Origin` aceptado SÓLO si es exactamente el origen público (esquema + host + puerto)
+    derivado de `PUBLIC_BASE_URL`. Antes se aceptaba cualquier esquema con el mismo host
+    (`http://…` frente a `https://…`), lo que debilitaba la defensa CSRF."""
     if not origin or origin == "null":
         return False
-    if origin.rstrip("/") == public_origin:
-        return True
-    netloc = parse.urlsplit(origin).netloc
-    return bool(host) and netloc.lower() == (host or "").lower()
+    parsed = parse.urlsplit(origin.strip())
+    if not parsed.scheme or not parsed.netloc or parsed.path not in ("", "/"):
+        return False
+    expected = parse.urlsplit(public_origin)
+    return (parsed.scheme.lower(), parsed.netloc.lower()) == (
+        expected.scheme.lower(),
+        expected.netloc.lower(),
+    )
 
 
 class CsrfMiddleware(BaseHTTPMiddleware):
@@ -58,7 +63,6 @@ class CsrfMiddleware(BaseHTTPMiddleware):
             header_ok = request.headers.get(CSRF_HEADER) == CSRF_HEADER_VALUE
             origin_ok = is_same_origin(
                 origin=request.headers.get("origin"),
-                host=request.headers.get("host"),
                 public_origin=settings.get_settings().public_origin,
             )
             if not (header_ok and origin_ok):

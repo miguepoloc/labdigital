@@ -250,7 +250,10 @@ def revoke_other_sessions(
     responses={401: {"description": "Sin access válido"}},
 )
 def verify(request: fastapi.Request) -> fastapi.Response:
-    """Para nginx `auth_request` (contrato §3). SIN BD: sólo valida el JWT de `ld_access`."""
+    """Para nginx `auth_request` (contrato §3). SIN BD: sólo valida el JWT de `ld_access`.
+
+    `X-LabDigital-Email` y `X-LabDigital-Name` van URL-encoded (UTF-8): las cabeceras HTTP
+    sólo admiten latin-1 y un correo internacional (`josé@…`) daba 500."""
     claims = api_auth.claims_from_cookie(request)
     if claims is None:
         return exception_handler.error_response(
@@ -262,7 +265,7 @@ def verify(request: fastapi.Request) -> fastapi.Response:
         status_code=status.HTTP_204_NO_CONTENT,
         headers={
             "X-LabDigital-User": claims.user_id,
-            "X-LabDigital-Email": claims.email,
+            "X-LabDigital-Email": parse.quote(claims.email, safe="@+"),
             "X-LabDigital-Name": parse.quote(claims.name, safe=""),
             "X-LabDigital-Role": claims.role,
             "Cache-Control": "no-store",
