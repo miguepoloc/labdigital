@@ -115,8 +115,9 @@ export const projectsApi = {
   remove: (id: UUID) => api.delete<void>(`/projects/${enc(id)}`),
   autosave: (id: UUID, body: AutosaveRequest, opts?: { signal?: AbortSignal }) =>
     api.put<AutosaveResponse>(`/projects/${enc(id)}/autosave`, body, opts),
+  /** Devuelve el `Project` con la versión manual como actual y la `revision` nueva (contrato §6.1). */
   createVersion: (id: UUID, label?: string) =>
-    api.post<ProjectVersion>(`/projects/${enc(id)}/versions`, label ? { label } : {}),
+    api.post<Project>(`/projects/${enc(id)}/versions`, label ? { label } : {}),
   listVersions: (id: UUID) => api.get<ProjectVersion[]>(`/projects/${enc(id)}/versions`),
   getVersion: (id: UUID, vid: UUID) =>
     api.get<ProjectVersionDetail>(`/projects/${enc(id)}/versions/${enc(vid)}`),

@@ -377,13 +377,6 @@ async function ensureSaved(): Promise<void> {
   }
 }
 
-async function refreshBase(id: string) {
-  const p = await projectsApi.get(id)
-  setProject(p)
-  saver?.rebase(baseOf(p))
-  return p
-}
-
 async function saveVersion() {
   const p = project.value
   if (!p) return
@@ -391,9 +384,13 @@ async function saveVersion() {
   notice.value = null
   try {
     await ensureSaved()
-    const v = await projectsApi.createVersion(p.id)
-    await refreshBase(p.id)
-    notice.value = { kind: 'success', text: t('projects.fpga.versionSaved', { n: v.n }) }
+    const updated = await projectsApi.createVersion(p.id)
+    setProject(updated)
+    saver?.rebase(baseOf(updated))
+    notice.value = {
+      kind: 'success',
+      text: t('projects.fpga.versionSaved', { n: updated.current_version_n }),
+    }
   } catch (e) {
     notice.value = { kind: 'danger', text: errorMessage(e) }
   } finally {

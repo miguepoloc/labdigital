@@ -54,9 +54,12 @@ async function saveVersion() {
   status.value = null
   busy.value = 'save'
   try {
-    const v = await projectsApi.createVersion(id.value)
+    const updated = await projectsApi.createVersion(id.value)
     await refreshAfterChange()
-    status.value = { kind: 'success', text: t('projects.detail.versionSaved', { n: v.n }) }
+    status.value = {
+      kind: 'success',
+      text: t('projects.detail.versionSaved', { n: updated.current_version_n }),
+    }
   } catch (e) {
     status.value = { kind: 'danger', text: errorMessage(e) }
   } finally {

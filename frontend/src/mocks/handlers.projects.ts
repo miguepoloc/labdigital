@@ -476,7 +476,8 @@ export const projectHandlers = [
       p!.updated_at = iso
       p!.revision++
       save()
-      return HttpResponse.json(toVersion(v), { status: 201 })
+      // Como la API real (contrato §6.1): devuelve el `Project` con la versión manual como actual.
+      return HttpResponse.json(toProject(p!), { status: 201 })
     }),
   ),
 
