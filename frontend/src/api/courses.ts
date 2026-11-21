@@ -101,8 +101,9 @@ export interface LabInput {
   allow_resubmission: boolean
 }
 
+/** Integrante de un equipo (contrato §6.1: `{id, full_name}`, no `user_id` como en `Member`). */
 export interface TeamMember {
-  user_id: UUID
+  id: UUID
   full_name: string
 }
 

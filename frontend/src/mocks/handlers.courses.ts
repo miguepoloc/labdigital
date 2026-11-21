@@ -217,7 +217,7 @@ function toTeam(t: MTeam, userId: string, isTeacher: boolean) {
     name: t.name,
     join_code: isTeacher || t.member_ids.includes(userId) ? t.join_code : null,
     locked: t.locked,
-    members: t.member_ids.map((id) => ({ user_id: id, full_name: userById(id)?.full_name ?? '' })),
+    members: t.member_ids.map((id) => ({ id, full_name: userById(id)?.full_name ?? '' })),
   }
 }
 

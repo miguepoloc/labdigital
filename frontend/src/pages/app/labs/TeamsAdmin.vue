@@ -24,7 +24,7 @@ const selection = ref<string[]>([])
 
 const teamOf = computed(() => {
   const map = new Map<string, Team>()
-  for (const tm of teams.value) for (const m of tm.members) map.set(m.user_id, tm)
+  for (const tm of teams.value) for (const m of tm.members) map.set(m.id, tm)
   return map
 })
 const withoutTeam = computed(() => students.value.filter((s) => !teamOf.value.has(s.user_id)))
@@ -66,7 +66,7 @@ async function lock(team: Team) {
 
 function openReassign(team: Team) {
   editing.value = team
-  selection.value = team.members.map((m) => m.user_id)
+  selection.value = team.members.map((m) => m.id)
 }
 
 async function saveMembers() {

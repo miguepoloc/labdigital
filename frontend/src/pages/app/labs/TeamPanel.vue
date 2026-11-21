@@ -25,7 +25,7 @@ const busy = ref<'create' | 'join' | 'leave' | null>(null)
 const confirmLeave = ref(false)
 
 const mine = computed(
-  () => teams.value.find((tm) => tm.members.some((m) => m.user_id === props.userId)) ?? null,
+  () => teams.value.find((tm) => tm.members.some((m) => m.id === props.userId)) ?? null,
 )
 
 async function load() {
@@ -125,7 +125,7 @@ onMounted(load)
             }}
           </p>
           <ul class="ld-team__members">
-            <li v-for="m in mine.members" :key="m.user_id">{{ m.full_name }}</li>
+            <li v-for="m in mine.members" :key="m.id">{{ m.full_name }}</li>
           </ul>
         </div>
         <p v-if="mine.locked" class="ld-muted">{{ t('teams.lockedHelp') }}</p>
