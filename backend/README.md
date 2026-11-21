@@ -14,12 +14,17 @@ Despliegue en Docker siempre encendido (uvicorn); sin Lambda/Mangum/SNS/SQS.
 | `identity/sessions/` | Agregado `Session` = familia de refresh tokens: rotación y detección de reuso |
 | `identity/services/` | Orquestadores: login, refresh, reset de contraseña, cambio de contraseña, desactivar |
 | `identity/entrypoints/` | Rutas `/v1/auth/*`, `/v1/me`, JWKS; housekeeping |
-| `projects/projects/` | Agregado `Project` con versiones (autosave/manual, conflicto, restaurar, borrado lógico) |
+| `identity/entrypoints/web/admin.py` | `/v1/admin/users` (buscar, desactivar, activar, rol; rol admin comprobado en BD) |
+| `projects/projects/` | Agregado `Project` con versiones (autosave/manual/submitted, `revision`, conflicto, restaurar, borrado lógico, versiones congeladas) |
+| `teaching/` | Producto docente: `courses` (`Course`, `Membership`), `labs` (`Lab`, `Team`), `submissions` (`Submission` + `Review`); `teaching/commons` (ids, `Viewer`, `GradeScale`, puertos) y `teaching/services` (orquestadores con los permisos) |
+| `files/blobs/` | Agregado `Blob` + almacenamiento en disco direccionado por SHA-256 (`BLOB_DIR`) |
+| `orchestrators/ports.py` | Adaptadores de los puertos entre productos (directorio de usuarios, congelar proyecto, archivos, acceso a blobs) |
 | `entrypoints/web/app.py` | App FastAPI única (`root_path=/labdigital/api`, rutas bajo `/v1`) |
 | `entrypoints/worker/main.py` | Worker: outbox → correo SMTP (con reintentos) + limpieza horaria |
 
 Contratos import-linter en `.importlinter` (pureza de dominio, capas, independencia
-users/sessions e identity/projects, commons, entrypoints y orquestadores delgados).
+users/sessions, de los subcontextos de teaching y de los productos identity/projects/teaching/
+files entre sí, commons, entrypoints y orquestadores delgados).
 
 ## Desarrollo
 
@@ -39,7 +44,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy src
 uv run lint-imports
 uv run pytest -m unit         # fakes, sin I/O
-uv run pytest -m "integration or e2e"   # Postgres real (testcontainers, contenedor ld-test-pg-*)
+uv run pytest -m "integration or e2e"   # Postgres real (testcontainers, contenedor ld-test-pg-*; prefijo con LD_TEST_CONTAINER_PREFIX)
 ```
 
 Los tests generan sus propias claves RS256, usan Argon2 barato y migran con
@@ -61,3 +66,25 @@ contra un SMTP local (aiosmtpd).
 - Imagen: `Dockerfile` (python:3.13-slim, uv, usuario no root 10001). La misma imagen sirve
   API (`CMD` por defecto), worker (`python -m backend.entrypoints.worker.main`) y migraciones
   (`alembic upgrade head`).
+- **Producto `teaching`** (cursos, labs, equipos, entregas) separado de `projects` e
+  `identity`: lo que necesita de ellos (nombres, congelar una versión, metadatos de archivos)
+  lo pide por puertos (`teaching/commons/ports.py`); los adaptadores viven en
+  `orchestrators/ports.py` y la app los inyecta con `dependency_overrides`. Cada producto
+  confirma su propia transacción (§10.3).
+- **Autorización en servicios**: el `Viewer` (sub + rol del access) llega a cada caso de uso.
+  Sin relación con el curso ⇒ 404; estudiante haciendo algo de docente ⇒ 403; admin ve todo.
+  Las rutas privadas comprueban además en BD que la sesión `sid` sigue viva y que `ver`
+  coincide (un access robado muere al cerrar/revocar la sesión o desactivar al usuario).
+- **Versión entregada inmutable**: entregar congela la versión en `projects`
+  (`kind=submitted`, `locked`); el autosave nunca sobrescribe una versión bloqueada (crea otra),
+  el repositorio sólo actualiza filas `locked = false` y un trigger de Postgres rechaza cambiar
+  `content` o desbloquear. La entrega referencia esa versión con FK `RESTRICT`.
+- **Notas CSV** (`GET /courses/{id}/grades.csv`): UTF-8 con BOM, `;`, coma decimal, CRLF;
+  `Nombre;Correo;<lab>…`, una fila por estudiante activo con la última nota de cada lab;
+  `pass_fail` ⇒ `Aprobado`/`No aprobado`; celdas que empiezan por `= + - @` con `'` delante.
+- **Archivos**: 25 MB/archivo (el middleware de tamaño sube su límite sólo para
+  `POST /v1/files`), 100 MB/entrega; extensión permitida por `kind` + firma mágica.
+- **IP real**: uvicorn con `--proxy-headers` sólo confía en `FORWARDED_ALLOW_IPS` (por defecto
+  `127.0.0.1`; en producción, el gateway del bridge donde está nginx). Login: 5/min por
+  IP+correo, retardo creciente tras 3 fallos y 20/h por correo; recuperación/reenvío: 3/h por
+  IP+correo, 20/h por IP, 10/h por correo.
