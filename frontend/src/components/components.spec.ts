@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import LdAlert from './LdAlert.vue'
 import LdButton from './LdButton.vue'
 import LdPasswordField from './LdPasswordField.vue'
@@ -33,6 +34,22 @@ describe('componentes base', () => {
     const w = mount(LdButton, { props: { loading: true }, slots: { default: 'Enviar' } })
     expect(w.find('button').attributes('disabled')).toBeDefined()
     expect(w.find('button').attributes('aria-busy')).toBe('true')
+  })
+
+  it('LdButton con `to` renderiza un enlace con href (y `href` externo tal cual)', async () => {
+    const router = createRouter({
+      history: createMemoryHistory('/labdigital/'),
+      routes: [{ path: '/', name: 'x', component: { template: '<div />' } }],
+    })
+    await router.push('/')
+    const w = mount(LdButton, {
+      props: { to: { name: 'x' } },
+      slots: { default: 'Ir' },
+      global: { plugins: [router] },
+    })
+    expect(w.find('a').attributes('href')).toBe('/labdigital/')
+    const ext = mount(LdButton, { props: { href: 'https://ejemplo.co/' } })
+    expect(ext.find('a').attributes('href')).toBe('https://ejemplo.co/')
   })
 
   it('LdAlert: danger usa role=alert, info role=status', () => {
