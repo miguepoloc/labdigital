@@ -331,7 +331,7 @@ describe('Revisión del docente', () => {
     await grade.setValue('4,55')
     await wrapper.find('[data-test="review-form"]').trigger('submit')
     await settle()
-    expect(wrapper.find('[data-test="grade-error"]').text()).toContain('1 decimales')
+    expect(wrapper.find('[data-test="grade-error"]').text()).toContain('1 decimal(es)')
     await grade.setValue('4,2')
     await wrapper.find('textarea[name="comment"]').setValue('Bien, aunque tardía.')
     await wrapper.find('[data-test="review-form"]').trigger('submit')
