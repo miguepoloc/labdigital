@@ -25,7 +25,7 @@ function setup(save?: (b: AutosaveRequest) => Promise<AutosaveResponse>) {
   const states: AutosaverSnapshot['status'][] = []
   const keepalive = vi.fn(() => true)
   const saver = new Autosaver({
-    base: { version: 'v1', revision: 7 },
+    base: { version: 'v1', n: 1, revision: 7 },
     save: (b) => {
       calls.push(structuredClone(b))
       return impl(b)
@@ -43,7 +43,7 @@ const conflict = (rev: number) =>
     status: 409,
     code: 'version_conflict',
     message: 'conflicto',
-    details: { current_version: 'v9', current_revision: rev },
+    details: { current_version: 9, current_revision: rev, current_version_id: 'v9' },
   })
 
 describe('Autosaver', () => {
@@ -60,13 +60,13 @@ describe('Autosaver', () => {
     expect(saver.snapshot.status).toBe('pending')
     await vi.advanceTimersByTimeAsync(1)
     expect(calls).toHaveLength(1)
-    expect(calls[0]).toEqual({ content: content('b'), base_version: 'v1', base_revision: 7 })
+    expect(calls[0]).toEqual({ content: content('b'), base_version: 1, base_revision: 7 })
     expect(saver.snapshot.status).toBe('saved')
     expect(saver.snapshot.lastSavedAt).not.toBeNull()
     // El siguiente guardado parte de la revisión devuelta.
     saver.change(content('c'))
     await vi.advanceTimersByTimeAsync(5000)
-    expect(calls[1]).toMatchObject({ base_version: 'v1', base_revision: 8 })
+    expect(calls[1]).toMatchObject({ base_version: 1, base_revision: 8 })
   })
 
   it('no lanza dos guardados a la vez: lo que llega mientras guarda sale después', async () => {
@@ -95,18 +95,18 @@ describe('Autosaver', () => {
     let fail = true
     const { saver, calls } = setup(async (b) => {
       if (fail) throw conflict(12)
-      return { version_id: b.base_version, n: 3, revision: b.base_revision + 1 }
+      return { version_id: 'v' + String(b.base_version), n: b.base_version, revision: b.base_revision + 1 }
     })
     saver.change(content('mio'))
     await vi.advanceTimersByTimeAsync(5000)
     expect(saver.snapshot.status).toBe('conflict')
-    expect(saver.snapshot.conflict).toEqual({ current_version: 'v9', current_revision: 12 })
+    expect(saver.snapshot.conflict).toEqual({ current_version: 9, current_revision: 12, current_version_id: 'v9' })
     saver.change(content('mio 2'))
     await vi.advanceTimersByTimeAsync(60_000)
     expect(calls).toHaveLength(1)
     fail = false
     await saver.overwrite()
-    expect(calls[1]).toEqual({ content: content('mio 2'), base_version: 'v9', base_revision: 12 })
+    expect(calls[1]).toEqual({ content: content('mio 2'), base_version: 9, base_revision: 12 })
     expect(saver.snapshot.status).toBe('saved')
   })
 
@@ -116,7 +116,7 @@ describe('Autosaver', () => {
     })
     saver.change(content('x'))
     await vi.advanceTimersByTimeAsync(5000)
-    saver.reset({ version: 'v9', revision: 12 })
+    saver.reset({ version: 'v9', n: 9, revision: 12 })
     expect(saver.snapshot.status).toBe('saved')
     expect(saver.unsaved).toBeNull()
     await vi.advanceTimersByTimeAsync(60_000)
@@ -170,7 +170,7 @@ describe('Autosaver', () => {
     expect(saver.flushOnExit()).toBe(true)
     expect(keepalive).toHaveBeenCalledWith({
       content: content('b'),
-      base_version: 'v1',
+      base_version: 1,
       base_revision: 8,
     })
   })
@@ -189,7 +189,7 @@ describe('Autosaver', () => {
     saver.change(content('b'))
     await vi.advanceTimersByTimeAsync(5000)
     expect(calls).toHaveLength(2)
-    expect(calls[1]).toMatchObject({ base_version: 'v9', base_revision: 8 })
+    expect(calls[1]).toMatchObject({ base_version: 9, base_revision: 8 })
     expect(saver.snapshot.status).toBe('saved')
   })
 })

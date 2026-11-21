@@ -105,8 +105,9 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
 - `next` es siempre la ruta completa con prefijo (`/labdigital/app/...`, `/labdigital/fpga/...`).
 - **Revisión de autosave** (tras LD-3): `Project` y la respuesta de `PUT /projects/{id}/autosave` incluyen `revision`
   (entero que sube en CADA guardado, también cuando el autosave sobrescribe la versión abierta). El autosave envía
-  `{content, base_version, base_revision}`; si `base_revision` ≠ la actual ⇒ 409 `version_conflict` con
-  `details: {current_version, current_revision}`.
+  `{content, base_version, base_revision}` (`base_version` = el **número `n`** entero de la versión actual, no su id);
+  si no son los actuales ⇒ 409 `version_conflict` con `details: {current_version (n), current_revision,
+  current_version_id}`.
 - **Refresh concurrente**: reusar el refresh recién rotado dentro de **10 s** no revoca la familia (devuelve 204 con
   cookies nuevas de la misma familia); fuera de esa ventana sí (robo). El frontend además serializa la renovación entre
   pestañas con `navigator.locks.request("ld-refresh", …)` (si no existe, el candado por pestaña).

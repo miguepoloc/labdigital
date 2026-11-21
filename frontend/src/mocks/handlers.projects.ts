@@ -429,10 +429,17 @@ export const projectHandlers = [
       const bad = checkContent(body.content)
       if (bad) return bad
       const cur = current(p!)
-      if (body.base_revision !== p!.revision || body.base_version !== cur.id) {
+      // Como la API real: `base_version` es el `n` (entero) de la versión actual.
+      if (typeof body.base_version !== 'number') {
+        return err(422, 'validation_error', 'Algunos datos no son válidos.', {
+          fields: { base_version: 'Debe ser un número entero.' },
+        })
+      }
+      if (body.base_revision !== p!.revision || body.base_version !== cur.n) {
         return err(409, 'version_conflict', 'El proyecto cambió en otro lugar.', {
-          current_version: cur.id,
+          current_version: cur.n,
           current_revision: p!.revision,
+          current_version_id: cur.id,
         })
       }
       const now = new Date()

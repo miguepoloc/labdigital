@@ -81,12 +81,13 @@ export interface CreateProjectRequest {
 }
 
 /**
- * `PUT /projects/{id}/autosave` (contrato §4 y §6.1): `base_version` es el `id` de la versión actual que conoce
- * el cliente y `base_revision` su revisión; si la revisión no es la actual ⇒ 409 `version_conflict`.
+ * `PUT /projects/{id}/autosave` (contrato §4 y §6.1): `base_version` es el NÚMERO `n` de la versión actual que
+ * conoce el cliente (no su id: la API valida un entero) y `base_revision` su revisión; si no son los actuales ⇒
+ * 409 `version_conflict`.
  */
 export interface AutosaveRequest {
   content: ProjectContent
-  base_version: UUID
+  base_version: number
   base_revision: number
 }
 
@@ -98,8 +99,10 @@ export interface AutosaveResponse {
 
 /** `details` del 409 `version_conflict` (contrato §6.1). */
 export interface VersionConflictDetails {
-  current_version?: UUID
+  /** `n` de la versión actual del servidor. */
+  current_version?: number
   current_revision?: number
+  current_version_id?: UUID
 }
 
 const enc = encodeURIComponent

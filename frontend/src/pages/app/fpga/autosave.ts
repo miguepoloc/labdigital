@@ -22,7 +22,10 @@ import type {
 export type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'offline' | 'conflict' | 'error'
 
 export interface SaveBase {
+  /** Id de la versión actual (lo usa la entrega). */
   version: string
+  /** Su número `n`: es lo que viaja como `base_version` en el autoguardado. */
+  n: number
   revision: number
 }
 
@@ -159,8 +162,10 @@ export class Autosaver {
     const c = this.snap.conflict
     const next =
       current ??
-      (c?.current_version !== undefined && c.current_revision !== undefined
-        ? { version: c.current_version, revision: c.current_revision }
+      (c?.current_version !== undefined &&
+      c.current_revision !== undefined &&
+      c.current_version_id !== undefined
+        ? { version: c.current_version_id, n: c.current_version, revision: c.current_revision }
         : null)
     if (!next) throw new Error('Autosaver.overwrite: falta la versión actual del servidor')
     this.base = { ...next }
@@ -189,7 +194,7 @@ export class Autosaver {
   }
 
   private body(content: ProjectContent): AutosaveRequest {
-    return { content, base_version: this.base.version, base_revision: this.base.revision }
+    return { content, base_version: this.base.n, base_revision: this.base.revision }
   }
 
   private run(): Promise<void> {
@@ -209,7 +214,7 @@ export class Autosaver {
     try {
       const res = await this.opts.save(this.body(content))
       if (this.disposed) return
-      this.base = { version: res.version_id, revision: res.revision }
+      this.base = { version: res.version_id, n: res.n, revision: res.revision }
       this.attempt = 0
       this.keepaliveRevision = null
       if (this.pending) {
@@ -234,7 +239,11 @@ export class Autosaver {
         ) {
           // El 409 lo causó nuestro propio envío con keepalive: seguimos sobre esa revisión.
           this.keepaliveRevision = null
-          this.base = { version: details.current_version, revision: details.current_revision }
+          this.base = {
+            version: details.current_version_id ?? this.base.version,
+            n: details.current_version,
+            revision: details.current_revision,
+          }
           this.inFlight = null
           await this.run()
           return

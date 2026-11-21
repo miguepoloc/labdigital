@@ -142,7 +142,7 @@ async function fetchData(): Promise<Loaded> {
 }
 
 function baseOf(p: Project): SaveBase {
-  return { version: p.current_version_id, revision: p.revision }
+  return { version: p.current_version_id, n: p.current_version_n, revision: p.revision }
 }
 
 function setProject(p: Project) {
@@ -459,7 +459,11 @@ async function conflictOverwrite() {
   busy.value = 'conflict'
   try {
     const c = saver.snapshot.conflict
-    if (c?.current_version !== undefined && c.current_revision !== undefined) {
+    if (
+      c?.current_version !== undefined &&
+      c.current_revision !== undefined &&
+      c.current_version_id !== undefined
+    ) {
       await saver.overwrite()
     } else {
       const fresh = await projectsApi.get(p.id)

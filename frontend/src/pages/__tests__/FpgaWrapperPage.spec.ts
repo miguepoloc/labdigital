@@ -189,7 +189,7 @@ describe('Envoltorio FPGA: carga', () => {
     fake.edit('-- nuevo')
     await wait(DEBOUNCE + 30)
     await settle()
-    expect(st.calls.autosave.at(-1)).toMatchObject({ base_version: created.currentId })
+    expect(st.calls.autosave.at(-1)).toMatchObject({ base_version: created.versions.find((v) => v.id === created.currentId)!.n })
     wrapper.unmount()
   })
 })
@@ -209,7 +209,7 @@ describe('Envoltorio FPGA: autoguardado', () => {
     await settle()
     expect(st.calls.autosave).toHaveLength(1)
     expect(st.calls.autosave[0]).toMatchObject({
-      base_version: p.versions[2]!.id,
+      base_version: p.versions[2]!.n,
       base_revision: 0,
       content: { files: [{ text: '-- dos' }] },
     })
@@ -245,7 +245,7 @@ describe('Envoltorio FPGA: autoguardado', () => {
     await wait(DEBOUNCE + 30)
     await settle()
     expect(projectsState().calls.autosave.at(-1)).toMatchObject({
-      base_version: server.id,
+      base_version: server.n,
       base_revision: findMockProject(p.id)!.revision - 1,
     })
     expect(status(wrapper)).toMatch(/^Guardado/)
@@ -263,7 +263,7 @@ describe('Envoltorio FPGA: autoguardado', () => {
     await wrapper.find('[data-test="conflict-overwrite"]').trigger('click')
     await settle()
     expect(projectsState().calls.autosave.at(-1)).toMatchObject({
-      base_version: server.id,
+      base_version: server.n,
       base_revision: rev,
       content: { files: [{ text: '-- mio gana' }] },
     })
@@ -307,7 +307,7 @@ describe('Envoltorio FPGA: autoguardado', () => {
     await wait(DEBOUNCE + 30)
     await settle()
     expect(wrapper.find('[data-test="conflict"]').exists()).toBe(false)
-    expect(projectsState().calls.autosave.at(-1)).toMatchObject({ base_version: manual.id })
+    expect(projectsState().calls.autosave.at(-1)).toMatchObject({ base_version: manual.n })
     wrapper.unmount()
   })
 
