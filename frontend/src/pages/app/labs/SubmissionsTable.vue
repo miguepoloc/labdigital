@@ -28,10 +28,10 @@ const latestOnly = ref(true)
 const FILTERS: SubmissionBadge[] = ['submitted', 'late', 'graded', 'returned']
 
 function who(s: Submission) {
-  return s.team_name ?? s.submitted_by.full_name
+  return s.team?.name ?? s.submitted_by.full_name
 }
 function key(s: Submission) {
-  return s.team_id ? `t:${s.team_id}` : `u:${s.student_id ?? s.submitted_by.id}`
+  return s.team ? `t:${s.team.id}` : `u:${s.submitted_by.id}`
 }
 
 const latest = computed(() => {
@@ -136,7 +136,7 @@ onMounted(load)
             <tr v-for="s in rows" :key="s.id" data-test="submission-row">
               <td>
                 <strong>{{ who(s) }}</strong>
-                <span v-if="s.team_name" class="ld-muted ld-subs__members">
+                <span v-if="s.team" class="ld-muted ld-subs__members">
                   {{ s.members.map((m) => m.full_name).join(', ') }}
                 </span>
               </td>

@@ -59,7 +59,7 @@ const sorted = computed(() => [...props.submissions].sort((a, b) => b.attempt - 
         <article v-for="r in s.reviews" :key="r.id" class="ld-history__review" data-test="review">
           <p class="ld-muted ld-history__review-meta">
             {{ t('subs.reviewBy', { name: r.reviewer_name, date: formatBogota(r.created_at) }) }}
-            <LdBadge v-if="r.return_for_resubmission" tone="danger">{{
+            <LdBadge v-if="r.returned_for_resubmission" tone="danger">{{
               t('subs.returned')
             }}</LdBadge>
             <LdBadge v-if="r.grade !== null" tone="success">

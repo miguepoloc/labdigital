@@ -135,10 +135,8 @@ function toSubmission(s: MSubmission, withContent = false) {
     id: s.id,
     lab_id: s.lab_id,
     attempt: s.attempt,
-    student_id: s.student_id,
-    team_id: s.team_id,
     submitted_by: { id: s.submitted_by, full_name: userById(s.submitted_by)?.full_name ?? '' },
-    team_name: team?.name ?? null,
+    team: team ? { id: team.id, name: team.name } : null,
     members: memberIds.map((id) => ({ id, full_name: userById(id)?.full_name ?? '' })),
     project_id: s.project_id,
     project_name: project?.name ?? '',
@@ -161,7 +159,14 @@ function toSubmission(s: MSubmission, withContent = false) {
       })),
     reviews: cdb.reviews
       .filter((r) => r.submission_id === s.id)
-      .map((r) => ({ ...r, reviewer_name: userById(r.reviewer_id)?.full_name ?? '' })),
+      .map((r) => ({
+        id: r.id,
+        reviewer_name: userById(r.reviewer_id)?.full_name ?? '',
+        grade: r.grade,
+        comment: r.comment,
+        returned_for_resubmission: r.return_for_resubmission,
+        created_at: r.created_at,
+      })),
     ...(withContent
       ? {
           content: {
@@ -775,7 +780,8 @@ export const courseHandlers = [
       cdb.reviews.push(r)
       if (r.return_for_resubmission) s.status = 'returned'
       else if (grade !== null) s.status = 'graded'
-      return HttpResponse.json({ ...r, reviewer_name: user.full_name }, { status: 201 })
+      // Como la API real: devuelve la entrega actualizada.
+      return HttpResponse.json(toSubmission(s, true), { status: 201 })
     }),
   ),
 

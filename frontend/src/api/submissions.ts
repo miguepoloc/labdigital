@@ -23,13 +23,13 @@ export interface SubmissionFile extends UploadedFile {
   name: string
 }
 
+/** Revisión tal como la devuelve la API (contrato §6.1). */
 export interface Review {
   id: UUID
-  reviewer_id: UUID
   reviewer_name: string
   grade: number | null
   comment: string
-  return_for_resubmission: boolean
+  returned_for_resubmission: boolean
   created_at: ISODateTime
 }
 
@@ -37,12 +37,10 @@ export interface Submission {
   id: UUID
   lab_id: UUID
   attempt: number
-  student_id: UUID | null
-  team_id: UUID | null
-  /** Propuesta: quién entregó y nombre del equipo, para la tabla del docente. */
+  /** Quién entregó y, en labs en equipo, el equipo (contrato §6.1). */
   submitted_by: { id: UUID; full_name: string }
-  team_name: string | null
-  /** Propuesta: integrantes (para entregas de equipo). */
+  team: { id: UUID; name: string } | null
+  /** Integrantes al entregar. */
   members: { id: UUID; full_name: string }[]
   project_id: UUID
   project_name: string
@@ -104,7 +102,7 @@ export const submissionsApi = {
   listForLab: (labId: UUID) => api.get<Submission[]>(`/labs/${enc(labId)}/submissions`),
   get: (id: UUID) => api.get<Submission>(`/submissions/${enc(id)}`),
   review: (id: UUID, body: ReviewInput) =>
-    api.post<Review>(`/submissions/${enc(id)}/reviews`, body),
+    api.post<Submission>(`/submissions/${enc(id)}/reviews`, body),
 }
 
 export const projectsReadApi = {

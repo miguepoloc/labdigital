@@ -43,7 +43,7 @@ const simulatorUrl = computed(() =>
 )
 
 function sameGroup(a: Submission, b: Submission) {
-  return a.team_id ? a.team_id === b.team_id : a.student_id === b.student_id
+  return a.team ? a.team.id === b.team?.id : !b.team && a.submitted_by.id === b.submitted_by.id
 }
 
 async function load() {
@@ -126,9 +126,9 @@ watch(subId, load, { immediate: true })
           <dl class="ld-review__dl">
             <dt>{{ t('review.who') }}</dt>
             <dd>{{ sub.submitted_by.full_name }}</dd>
-            <template v-if="sub.team_name">
+            <template v-if="sub.team">
               <dt>{{ t('review.team') }}</dt>
-              <dd>{{ sub.team_name }}</dd>
+              <dd>{{ sub.team.name }}</dd>
               <dt>{{ t('review.members') }}</dt>
               <dd>{{ sub.members.map((m) => m.full_name).join(', ') }}</dd>
             </template>
