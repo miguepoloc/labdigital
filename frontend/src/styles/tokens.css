@@ -1,0 +1,175 @@
+/*
+ * Tokens del design system "LabDigital GIDEAM".
+ * Paleta oficial Unimagdalena (CDN) + acentos de laboratorio.
+ * Uso: siempre a través de las variables semánticas (--ld-color-*), no de las primitivas (--um-*).
+ * Tema: claro por defecto; oscuro con prefers-color-scheme salvo [data-theme="light"]; forzado con [data-theme="dark"].
+ */
+:root {
+  /* ---- Primitivas: paleta oficial Unimagdalena ---- */
+  --um-blue: #004b87; /* base */
+  --um-blue-300: #0183ef;
+  --um-blue-400: #005cab;
+  --um-blue-600: #003a6b;
+  --um-blue-800: #00294b;
+  --um-orange: #d17900; /* complemento */
+  --um-orange-300: #ff9400;
+  --um-orange-600: #a56000;
+  --um-lime: #a5ca00; /* secundarios */
+  --um-green: #00a50b;
+  --um-gold: #d1ae00;
+  --um-red: #d10500;
+
+  /* ---- Primitivas: acentos de laboratorio ---- */
+  --lab-pcb: #0b6b3a; /* verde placa */
+  --lab-led: #ff3b30; /* rojo LED */
+
+  /* ---- Neutros ---- */
+  --n-0: #ffffff;
+  --n-50: #f5f7fa;
+  --n-100: #eaeef3;
+  --n-200: #d5dce5;
+  --n-400: #8a96a6;
+  --n-600: #4d5968;
+  --n-800: #232b36;
+  --n-900: #141a22;
+  --n-950: #0b1017;
+
+  /* ---- Tipografía ---- */
+  --ld-font-heading: 'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ld-font-body: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ld-font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --ld-text-xs: 0.75rem;
+  --ld-text-sm: 0.875rem;
+  --ld-text-md: 1rem;
+  --ld-text-lg: 1.125rem;
+  --ld-text-xl: 1.375rem;
+  --ld-text-2xl: 1.75rem;
+  --ld-text-3xl: clamp(2rem, 1.4rem + 2.6vw, 3rem);
+  --ld-leading-tight: 1.2;
+  --ld-leading-normal: 1.55;
+
+  /* ---- Espaciado (escala de 4 px) ---- */
+  --ld-space-1: 0.25rem;
+  --ld-space-2: 0.5rem;
+  --ld-space-3: 0.75rem;
+  --ld-space-4: 1rem;
+  --ld-space-5: 1.5rem;
+  --ld-space-6: 2rem;
+  --ld-space-7: 3rem;
+  --ld-space-8: 4rem;
+
+  /* ---- Radios ---- */
+  --ld-radius-sm: 4px;
+  --ld-radius-md: 8px;
+  --ld-radius-lg: 14px;
+  --ld-radius-full: 999px;
+
+  /* ---- Movimiento / capas / tamaños ---- */
+  --ld-duration: 160ms;
+  --ld-ease: cubic-bezier(0.2, 0, 0, 1);
+  --ld-z-header: 20;
+  --ld-z-menu: 30;
+  --ld-header-h: 3.5rem;
+  --ld-sidebar-w: 15rem;
+  --ld-content-max: 72rem;
+  --ld-focus-ring: 0 0 0 3px var(--ld-color-focus);
+
+  /* ---- Semánticos: tema claro ---- */
+  color-scheme: light;
+  --ld-color-bg: var(--n-50);
+  --ld-color-surface: var(--n-0);
+  --ld-color-surface-2: var(--n-100);
+  --ld-color-border: var(--n-200);
+  --ld-color-text: var(--n-900);
+  --ld-color-text-muted: var(--n-600);
+  --ld-color-primary: var(--um-blue);
+  --ld-color-primary-hover: var(--um-blue-600);
+  --ld-color-primary-contrast: var(--n-0);
+  --ld-color-accent: var(--um-orange);
+  --ld-color-accent-hover: var(--um-orange-600);
+  --ld-color-link: var(--um-blue-400);
+  --ld-color-focus: color-mix(in srgb, var(--um-blue-300) 55%, transparent);
+  --ld-color-success: #007a08;
+  --ld-color-success-bg: #e7f6e8;
+  --ld-color-warning: #8a6100;
+  --ld-color-warning-bg: #fbf3d6;
+  --ld-color-danger: #b00400;
+  --ld-color-danger-bg: #fdeaea;
+  --ld-color-info: var(--um-blue-400);
+  --ld-color-info-bg: #e6f1fb;
+  --ld-color-pcb: var(--lab-pcb);
+  --ld-color-led: var(--lab-led);
+  --ld-color-header-bg: var(--um-blue);
+  --ld-color-header-text: var(--n-0);
+
+  /* ---- Sombras ---- */
+  --ld-shadow-sm: 0 1px 2px rgb(0 41 75 / 0.08);
+  --ld-shadow-md: 0 4px 14px rgb(0 41 75 / 0.1);
+  --ld-shadow-lg: 0 12px 32px rgb(0 41 75 / 0.16);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --ld-color-bg: var(--n-950);
+    --ld-color-surface: var(--n-900);
+    --ld-color-surface-2: var(--n-800);
+    --ld-color-border: #2e3946;
+    --ld-color-text: #e8edf3;
+    --ld-color-text-muted: #a3afbd;
+    --ld-color-primary: var(--um-blue-300);
+    --ld-color-primary-hover: #3aa0f5;
+    --ld-color-primary-contrast: var(--n-950);
+    --ld-color-accent: var(--um-orange-300);
+    --ld-color-accent-hover: #ffab3d;
+    --ld-color-link: #5cb2f7;
+    --ld-color-focus: color-mix(in srgb, var(--um-blue-300) 70%, transparent);
+    --ld-color-success: #4cd357;
+    --ld-color-success-bg: #0f2a12;
+    --ld-color-warning: #f0cc33;
+    --ld-color-warning-bg: #2c2508;
+    --ld-color-danger: #ff6b66;
+    --ld-color-danger-bg: #3a1010;
+    --ld-color-info: #5cb2f7;
+    --ld-color-info-bg: #0d2438;
+    --ld-color-pcb: #17a35c;
+    --ld-color-led: var(--lab-led);
+    --ld-color-header-bg: var(--um-blue-800);
+    --ld-color-header-text: #e8edf3;
+    --ld-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --ld-shadow-md: 0 4px 14px rgb(0 0 0 / 0.45);
+    --ld-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ld-color-bg: var(--n-950);
+  --ld-color-surface: var(--n-900);
+  --ld-color-surface-2: var(--n-800);
+  --ld-color-border: #2e3946;
+  --ld-color-text: #e8edf3;
+  --ld-color-text-muted: #a3afbd;
+  --ld-color-primary: var(--um-blue-300);
+  --ld-color-primary-hover: #3aa0f5;
+  --ld-color-primary-contrast: var(--n-950);
+  --ld-color-accent: var(--um-orange-300);
+  --ld-color-accent-hover: #ffab3d;
+  --ld-color-link: #5cb2f7;
+  --ld-color-focus: color-mix(in srgb, var(--um-blue-300) 70%, transparent);
+  --ld-color-success: #4cd357;
+  --ld-color-success-bg: #0f2a12;
+  --ld-color-warning: #f0cc33;
+  --ld-color-warning-bg: #2c2508;
+  --ld-color-danger: #ff6b66;
+  --ld-color-danger-bg: #3a1010;
+  --ld-color-info: #5cb2f7;
+  --ld-color-info-bg: #0d2438;
+  --ld-color-pcb: #17a35c;
+  --ld-color-led: var(--lab-led);
+  --ld-color-header-bg: var(--um-blue-800);
+  --ld-color-header-text: #e8edf3;
+  --ld-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --ld-shadow-md: 0 4px 14px rgb(0 0 0 / 0.45);
+  --ld-shadow-lg: 0 12px 32px rgb(0 0 0 / 0.55);
+}
