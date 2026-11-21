@@ -99,10 +99,16 @@ def verify_email(
     "/resend-verification", status_code=status.HTTP_202_ACCEPTED, response_model=AcceptedOutputDTO
 )
 def resend_verification(
-    body: EmailBody, uow: _dependencies.UowDep, config: _dependencies.ConfigDep
+    body: EmailBody,
+    uow: _dependencies.UowDep,
+    config: _dependencies.ConfigDep,
+    context: _dependencies.ContextDep,
 ) -> AcceptedOutputDTO:
     users.resend_verification(
-        uow=uow, input_dto=users_dto.EmailInputDTO(email=body.email), config=config
+        uow=uow,
+        input_dto=users_dto.EmailInputDTO(email=body.email),
+        config=config,
+        context=context,
     )
     return AcceptedOutputDTO()
 

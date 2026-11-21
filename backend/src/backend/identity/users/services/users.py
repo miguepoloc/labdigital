@@ -26,8 +26,21 @@ _LOGGER = logs.get_logger()
 
 LOGIN_RULE = rate_limits.RateLimitRule(name="login", limit=5, window_seconds=60)
 REGISTER_RULE = rate_limits.RateLimitRule(name="register", limit=10, window_seconds=3600)
-FORGOT_RULE = rate_limits.RateLimitRule(name="forgot", limit=3, window_seconds=3600)
-RESEND_RULE = rate_limits.RateLimitRule(name="resend", limit=3, window_seconds=3600)
+# Límite GLOBAL por correo, sin IP: `--proxy-headers` sólo es fiable tras el proxy de
+# confianza y, aun así, quien rota IPs no debe poder probar contraseñas sin fin.
+LOGIN_EMAIL_RULE = rate_limits.RateLimitRule(name="login_email", limit=20, window_seconds=3600)
+# Recuperación y reenvío: 3/h por IP+correo (un tercero no agota el cupo de la víctima desde
+# su IP), 20/h por IP (barridos) y 10/h por correo (tope absoluto de correos a un buzón).
+FORGOT_RULES = (
+    rate_limits.RateLimitRule(name="forgot", limit=3, window_seconds=3600),
+    rate_limits.RateLimitRule(name="forgot_ip", limit=20, window_seconds=3600),
+    rate_limits.RateLimitRule(name="forgot_email", limit=10, window_seconds=3600),
+)
+RESEND_RULES = (
+    rate_limits.RateLimitRule(name="resend", limit=3, window_seconds=3600),
+    rate_limits.RateLimitRule(name="resend_ip", limit=20, window_seconds=3600),
+    rate_limits.RateLimitRule(name="resend_email", limit=10, window_seconds=3600),
+)
 # Retardo creciente (plan §Autenticación): tras 3 fallos seguidos por IP+correo, 2 s; luego
 # 4, 8, 16 s… (tope 15 min). Se suma al límite fijo de 5/min.
 LOGIN_BACKOFF = rate_limits.BackoffRule(name="login_backoff")
@@ -128,11 +141,12 @@ def resend_verification(
     uow: unit_of_work.UnitOfWork,
     input_dto: dto.EmailInputDTO,
     config: dto.UsersConfig,
+    context: dto.RequestContext,
 ) -> None:
     email = _email_or_none(input_dto.email)
+    _enforce_email_flow_limits(uow, RESEND_RULES, ip=context.ip, email=email)
     if email is None:
         return
-    _enforce_rate_limit(uow, RESEND_RULE, email.value)
     with uow.transaction():
         user = _find_by_email(uow, email)
         if user is None or not user.is_active or user.is_email_verified:
@@ -162,6 +176,8 @@ def authenticate(
     key = f"{context.ip}|{email.value if email else '-'}"
     _enforce_backoff(uow, key)
     _enforce_rate_limit(uow, LOGIN_RULE, key)
+    if email is not None:
+        _enforce_rate_limit(uow, LOGIN_EMAIL_RULE, email.value)
 
     failure: exceptions.InvalidCredentialsError | None = None
     if email is None:
@@ -230,9 +246,9 @@ def request_password_reset(
 ) -> None:
     """3 solicitudes/h por correo. Sólo el último enlace emitido es válido."""
     email = _email_or_none(input_dto.email)
+    _enforce_email_flow_limits(uow, FORGOT_RULES, ip=context.ip, email=email)
     if email is None:
         return
-    _enforce_rate_limit(uow, FORGOT_RULE, email.value)
     with uow.transaction():
         user = _find_by_email(uow, email)
         if user is None or not user.is_active:
@@ -473,6 +489,29 @@ def _enforce_rate_limit(
         retry_after = uow.rate_limits.hit(rule, key)
     if retry_after is not None:
         raise commons_exceptions.TooManyRequestsError(retry_after_seconds=retry_after)
+
+
+def _enforce_email_flow_limits(
+    uow: unit_of_work.UnitOfWork,
+    rules: tuple[rate_limits.RateLimitRule, ...],
+    *,
+    ip: str,
+    email: value_objects.Email | None,
+) -> None:
+    """Cuenta en las tres reglas (IP+correo, IP, correo) en una transacción propia; 429 si
+    alguna se supera. Correo inválido: sólo cuenta la de IP."""
+    ip_email, per_ip, per_email = rules
+    retry: list[int] = []
+    with uow.transaction():
+        hits = [(per_ip, ip)]
+        if email is not None:
+            hits += [(ip_email, f"{ip}|{email.value}"), (per_email, email.value)]
+        for rule, key in hits:
+            retry_after = uow.rate_limits.hit(rule, key)
+            if retry_after is not None:
+                retry.append(retry_after)
+    if retry:
+        raise commons_exceptions.TooManyRequestsError(retry_after_seconds=max(retry))
 
 
 def _enforce_backoff(uow: unit_of_work.UnitOfWork, key: str) -> None:

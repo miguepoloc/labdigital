@@ -262,3 +262,76 @@ def test_change_password_requires_current() -> None:
     )  # type: ignore[arg-type]
     assert claims.credentials_version == 2
     assert value_objects.Email(value=_EMAIL) == f.users.get(user.id).email
+
+
+_HOUR_START = datetime.datetime(2030, 1, 7, 10, 0, 0, tzinfo=datetime.UTC)
+
+
+def _ctx(ip: str) -> dto.RequestContext:
+    return dto.RequestContext(ip=ip, user_agent="pytest")
+
+
+def test_login_global_email_limit_does_not_depend_on_the_ip() -> None:
+    """Regresión (revisión de seguridad, punto 1): rotar la IP (p. ej. falseando
+    X-Forwarded-For) no permite probar contraseñas sin fin contra un correo."""
+    f = builders.build()
+    with time_machine.travel(_HOUR_START, tick=False):
+        for i in range(20):
+            with pytest.raises(exceptions.InvalidCredentialsError):
+                users.authenticate(
+                    uow=f.uow,  # type: ignore[arg-type]
+                    input_dto=dto.LoginInputDTO(email="victima@example.com", password="x"),
+                    context=_ctx(f"10.1.0.{i}"),
+                )
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
+            users.authenticate(
+                uow=f.uow,  # type: ignore[arg-type]
+                input_dto=dto.LoginInputDTO(email="victima@example.com", password="x"),
+                context=_ctx("10.9.9.9"),
+            )
+
+
+def test_forgot_password_limits_per_ip_email_ip_and_email() -> None:
+    """Regresión (punto 5): un tercero que agota el cupo desde SU IP no bloquea la
+    recuperación de la víctima desde otra; topes globales por IP (20/h) y correo (10/h)."""
+    f = builders.build()
+    victim = dto.EmailInputDTO(email="victima@example.com")
+
+    def forgot(email: dto.EmailInputDTO, ip: str) -> None:
+        users.request_password_reset(
+            uow=f.uow, input_dto=email, config=builders.CONFIG, context=_ctx(ip)
+        )  # type: ignore[arg-type]
+
+    with time_machine.travel(_HOUR_START, tick=False):
+        for _ in range(3):
+            forgot(victim, "6.6.6.6")
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
+            forgot(victim, "6.6.6.6")
+        forgot(victim, "1.2.3.4")  # la víctima, desde su IP, sí puede
+        # Tope por correo: 10/h sumando todas las IPs (4 contados + 6 más = 10; el 11.º no).
+        for i in range(5):
+            forgot(victim, f"7.7.7.{i}")
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
+            forgot(victim, "8.8.8.8")
+        # Tope por IP: 20/h con correos distintos.
+        for i in range(20):
+            forgot(dto.EmailInputDTO(email=f"u{i}@example.com"), "9.9.9.9")
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
+            forgot(dto.EmailInputDTO(email="otro@example.com"), "9.9.9.9")
+
+
+def test_resend_verification_uses_the_same_limits() -> None:
+    f = builders.build()
+    email = dto.EmailInputDTO(email="nadie@example.com")
+    with time_machine.travel(_HOUR_START, tick=False):
+        for _ in range(3):
+            users.resend_verification(
+                uow=f.uow, input_dto=email, config=builders.CONFIG, context=_ctx("6.6.6.6")
+            )  # type: ignore[arg-type]
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
+            users.resend_verification(
+                uow=f.uow, input_dto=email, config=builders.CONFIG, context=_ctx("6.6.6.6")
+            )  # type: ignore[arg-type]
+        users.resend_verification(
+            uow=f.uow, input_dto=email, config=builders.CONFIG, context=_ctx("1.2.3.4")
+        )  # type: ignore[arg-type]

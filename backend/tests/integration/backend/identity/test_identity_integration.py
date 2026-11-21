@@ -177,7 +177,13 @@ def test_rate_limit_counter_survives_failed_logins(db: sa.Engine) -> None:
             users.authenticate(uow=uow, input_dto=login, context=builders.CONTEXT)
     assert info.value.retry_after_seconds == 15
     with db.connect() as conn:
-        assert conn.execute(sa.select(orm_base.RateLimitOrm.hits)).scalar_one() == 6
+        hits = dict(
+            conn.execute(sa.select(orm_base.RateLimitOrm.bucket, orm_base.RateLimitOrm.hits))
+            .tuples()
+            .all()
+        )
+    # La global por correo (que no depende de la IP) no cuenta el 6.º: el 429 llegó antes.
+    assert hits == {"login:10.0.0.1|nadie@example.com": 6, "login_email:nadie@example.com": 5}
 
 
 _MINUTE_START = datetime.datetime(2030, 1, 7, 10, 0, 0, tzinfo=datetime.UTC)
