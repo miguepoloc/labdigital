@@ -45,5 +45,18 @@ ADMIN_EMAILS=<correo1>,<correo2>
 
 ## Respaldos
 
-`deploy.sh` deja un `pg_dump` antes de cada despliegue (se guardan 14). Falta el respaldo diario y de `blobs`
-(cron + copia fuera del servidor) — pendiente A21.
+- Antes de cada despliegue: `deploy.sh` deja un `pg_dump` (se guardan 14).
+- **Diario 03:15** (cron de `gideam`): `deploy/backup.sh` (copiado a `~/labdigital-deploy/backup.sh`) guarda
+  `db-<fecha>.dump` (`pg_dump -Fc`, verificado con `pg_restore --list`) y `blobs-<fecha>.tar.gz` (volumen de
+  archivos, verificado con `tar -t`) en `~/labdigital-deploy/backups/diario/`, 14 días de retención, y escribe el
+  latido `labdigital_respaldo_ultimo_exito_timestamp` en `~/observabilidad/textfile_collector/labdigital.prom`.
+- Restaurar: `docker exec -i labdigital-db-1 sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
+  < db-<fecha>.dump` y descomprimir el tar en el volumen `labdigital_blobs` (con la API detenida). Probado
+  restaurando en una BD temporal.
+- **Pendiente**: copia fuera del servidor (hoy todo vive en el mismo disco).
+
+## Alertas (Prometheus, `~/observabilidad/prometheus/rules/labdigital.yml`)
+
+A39 web caída · A40 API caída · A41 módulo FPGA caído · **A42 `/labdigital/fpga/` sin sesión no redirige al login**
+(detecta el módulo abierto sin autenticación; módulo blackbox `http_redirect_login`) · A43 respaldo > 26 h ·
+A44 sin latido de respaldo. Los contenedores `labdigital-*` quedan cubiertos por las alertas genéricas de contenedores.
