@@ -15,15 +15,17 @@ from sqlalchemy import orm
 from sqlalchemy.dialects import postgresql
 
 from backend.commons.adapters import orm_base
-from backend.commons.domain import exceptions, rate_limits, value_objects
+from backend.commons.domain import rate_limits, value_objects
 
 
 class RateLimitRepository:
     def __init__(self, session: orm.Session) -> None:
         self._session = session
 
-    def hit(self, rule: rate_limits.RateLimitRule, key: str) -> None:
-        """Cuenta un intento; lanza `TooManyRequestsError` si supera el límite."""
+    def hit(self, rule: rate_limits.RateLimitRule, key: str) -> int | None:
+        """Cuenta un intento. Devuelve los segundos de `Retry-After` si se superó el límite
+        (o `None`). No lanza: el llamador debe CONFIRMAR la transacción (para que el intento
+        quede contado) y lanzar `TooManyRequestsError` después."""
         now_seconds = value_objects.PosixTime.now().microseconds // 1_000_000
         window = rule.window_seconds
         window_start = now_seconds - now_seconds % window
@@ -41,9 +43,8 @@ class RateLimitRepository:
         )
         hits = self._session.execute(stmt).scalar_one()
         if hits > rule.limit:
-            raise exceptions.TooManyRequestsError(
-                retry_after_seconds=max(1, window_start + window - now_seconds)
-            )
+            return max(1, window_start + window - now_seconds)
+        return None
 
     def prune(self) -> int:
         now_seconds = value_objects.PosixTime.now().microseconds // 1_000_000

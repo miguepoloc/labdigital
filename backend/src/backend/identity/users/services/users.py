@@ -15,6 +15,7 @@ import uuid
 
 from backend.commons.adapters import logs, unit_of_work
 from backend.commons.domain import audit, mail, rate_limits
+from backend.commons.domain import exceptions as commons_exceptions
 from backend.commons.domain import value_objects as base_value_objects
 from backend.identity.commons import value_objects as identity_value_objects
 from backend.identity.users.adapters import repository
@@ -45,8 +46,7 @@ def register(
 ) -> None:
     """Registro abierto. Si el correo ya existe: sin verificar ⇒ reenvía la verificación;
     verificado ⇒ avisa por correo de que ya tiene cuenta. La respuesta HTTP es la misma."""
-    with uow.transaction():
-        uow.rate_limits.hit(REGISTER_RULE, context.ip)
+    _enforce_rate_limit(uow, REGISTER_RULE, context.ip)
 
     if not input_dto.accept_data_policy:
         raise exceptions.DataPolicyNotAcceptedError()
@@ -129,8 +129,7 @@ def resend_verification(
     email = _email_or_none(input_dto.email)
     if email is None:
         return
-    with uow.transaction():
-        uow.rate_limits.hit(RESEND_RULE, email.value)
+    _enforce_rate_limit(uow, RESEND_RULE, email.value)
     with uow.transaction():
         user = _find_by_email(uow, email)
         if user is None or not user.is_active or user.is_email_verified:
@@ -153,8 +152,7 @@ def authenticate(
     ⇒ `invalid_credentials` (401); sólo con la contraseña correcta se revela
     `account_inactive`/`email_not_verified` (403). Re-hashea si los parámetros cambiaron."""
     email = _email_or_none(input_dto.email)
-    with uow.transaction():
-        uow.rate_limits.hit(LOGIN_RULE, f"{context.ip}|{email.value if email else '-'}")
+    _enforce_rate_limit(uow, LOGIN_RULE, f"{context.ip}|{email.value if email else '-'}")
     if email is None:
         value_objects.burn_password_check(input_dto.password)
         raise exceptions.InvalidCredentialsError()
@@ -221,8 +219,7 @@ def request_password_reset(
     email = _email_or_none(input_dto.email)
     if email is None:
         return
-    with uow.transaction():
-        uow.rate_limits.hit(FORGOT_RULE, email.value)
+    _enforce_rate_limit(uow, FORGOT_RULE, email.value)
     with uow.transaction():
         user = _find_by_email(uow, email)
         if user is None or not user.is_active:
@@ -364,6 +361,16 @@ def delete_expired_email_tokens(*, uow: unit_of_work.UnitOfWork) -> int:
 # --------------------------------------------------------------------------------------
 # Auxiliares
 # --------------------------------------------------------------------------------------
+
+
+def _enforce_rate_limit(
+    uow: unit_of_work.UnitOfWork, rule: rate_limits.RateLimitRule, key: str
+) -> None:
+    """Cuenta el intento en su propia transacción (confirmada) y luego, si procede, 429."""
+    with uow.transaction():
+        retry_after = uow.rate_limits.hit(rule, key)
+    if retry_after is not None:
+        raise commons_exceptions.TooManyRequestsError(retry_after_seconds=retry_after)
 
 
 def _verify_and_maybe_promote(

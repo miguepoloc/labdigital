@@ -9,7 +9,7 @@ from collections.abc import Generator
 import contextlib
 from typing import Any
 
-from backend.commons.domain import aggregates, audit, events, exceptions, rate_limits, repositories
+from backend.commons.domain import aggregates, audit, events, rate_limits, repositories
 
 
 class FakeOutbox:
@@ -45,11 +45,10 @@ class FakeRateLimits:
     def __init__(self) -> None:
         self.hits: dict[str, int] = {}
 
-    def hit(self, rule: rate_limits.RateLimitRule, key: str) -> None:
+    def hit(self, rule: rate_limits.RateLimitRule, key: str) -> int | None:
         bucket = f"{rule.name}:{key}"
         self.hits[bucket] = self.hits.get(bucket, 0) + 1
-        if self.hits[bucket] > rule.limit:
-            raise exceptions.TooManyRequestsError(retry_after_seconds=rule.window_seconds)
+        return rule.window_seconds if self.hits[bucket] > rule.limit else None
 
 
 class FakeUnitOfWork:
