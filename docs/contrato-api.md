@@ -94,6 +94,16 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
 (+ `Retry-After`), `csrf_rejected`, `token_invalid`, `version_conflict`, `deadline_passed`, `forbidden`, `not_found`,
 `validation_error`, `payload_too_large`.
 
+### 6.1 Precisiones (acordadas tras LD-7)
+
+- **401 = sólo sesión ausente/caducada**, con código `unauthenticated` (el cliente lo usa para renovar). Credenciales
+  equivocadas en `POST /me/password` ⇒ **400** `invalid_current_password` (nunca 401). Login fallido sigue 401
+  `invalid_credentials` (no dispara renovación: el cliente lo excluye).
+- **422 `validation_error`**: `details.fields = { "<campo>": "<mensaje en español>" }`.
+- `Session = { id, user_agent, ip, created_at, last_used_at, current: bool }`.
+- `PATCH /me` devuelve `Me`.
+- `next` es siempre la ruta completa con prefijo (`/labdigital/app/...`, `/labdigital/fpga/...`).
+
 ## 7. API de integración del módulo FPGA (`window.JGFPGA`, PR a mcangen/JG-FPGA)
 
 ```js
