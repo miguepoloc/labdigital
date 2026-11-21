@@ -13,7 +13,7 @@ x-backend-env: &backend-env
   SMTP_PORT: ${SMTP_PORT:-587}
   SMTP_USER: ${SMTP_USER}
   SMTP_PASSWORD: ${SMTP_PASSWORD}
-  SMTP_STARTTLS: "true"
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
   MAIL_FROM: ${MAIL_FROM:-LabDigital GIDEAM <no-responder@mcda.tools>}
   PUBLIC_BASE_URL: https://gideam.unimagdalena.edu.co/labdigital
   ADMIN_EMAILS: ${ADMIN_EMAILS}
@@ -68,6 +68,17 @@ services:
     ports:
       - "127.0.0.1:8089:80"
     mem_limit: 256m
+
+  # Solo para pruebas: buzon que captura los correos (docker compose --profile mail-dev ...).
+  # UI en http://127.0.0.1:8025 ; en el .env: SMTP_HOST=mailpit SMTP_PORT=1025 SMTP_STARTTLS=false
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    profiles: ["mail-dev"]
+    restart: unless-stopped
+    networks: [labdigital]
+    ports:
+      - "127.0.0.1:8025:8025"
+    mem_limit: 128m
 
 networks:
   labdigital:

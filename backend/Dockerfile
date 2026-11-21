@@ -20,14 +20,14 @@ COPY --from=build --chown=labdigital:labdigital /app/.venv /app/.venv
 COPY --chown=labdigital:labdigital src ./src
 COPY --chown=labdigital:labdigital alembic.ini ./
 COPY --chown=labdigital:labdigital migrations ./migrations
+# Directorio de blobs con el dueño correcto: un volumen nombrado nuevo copia estos permisos al montarse
+RUN mkdir -p /data/blobs && chown labdigital:labdigital /data/blobs
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER labdigital
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=4).status == 200 else 1)"
-# --proxy-headers: la IP del cliente sale de X-Forwarded-For puesto por nginx. El puerto del
-# contenedor sólo se publica en 127.0.0.1 del host, así que se confía en cualquier origen.
-# `--proxy-headers` sólo confía en X-Forwarded-For de las IPs de FORWARDED_ALLOW_IPS (uvicorn
+# sólo confía en X-Forwarded-For de las IPs de FORWARDED_ALLOW_IPS (uvicorn
 # la lee del entorno). NUNCA "*": cualquiera falsearía su IP y se saltaría los límites. El
 # compose de producción la fija a la IP del gateway del bridge (donde llega nginx).
 ENV FORWARDED_ALLOW_IPS=127.0.0.1
