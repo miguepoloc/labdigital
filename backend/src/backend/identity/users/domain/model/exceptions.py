@@ -42,15 +42,11 @@ class InvalidEmailTokenError(exceptions.BadRequestError):
         super().__init__("El enlace no es válido o ha caducado.", code="token_invalid")
 
 
-class CurrentPasswordMismatchError(exceptions.ValidationError):
-    """422 y no 401: un 401 haría que el frontend intente refrescar la sesión."""
+class CurrentPasswordMismatchError(exceptions.BadRequestError):
+    """400 y nunca 401 (contrato §6.1): un 401 haría que el frontend intente renovar."""
 
     def __init__(self) -> None:
-        super().__init__(
-            "La contraseña actual no es correcta.",
-            code="invalid_credentials",
-            details={"field": "current"},
-        )
+        super().__init__("La contraseña actual no es correcta.", code="invalid_current_password")
 
 
 class DataPolicyNotAcceptedError(exceptions.ValidationError):
@@ -67,4 +63,4 @@ class StaleCredentialsError(exceptions.UnauthorizedError):
     `credentials_version` (contraseña restablecida/cambiada)."""
 
     def __init__(self) -> None:
-        super().__init__("Sesión no válida o caducada.", code="token_invalid")
+        super().__init__("Sesión no válida o caducada.", code="unauthenticated")

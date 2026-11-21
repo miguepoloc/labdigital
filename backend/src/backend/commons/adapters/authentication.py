@@ -43,7 +43,7 @@ class AccessClaims(pydantic.BaseModel):
 
 class InvalidAccessTokenError(Exception):
     """El access falta, está mal formado, caducó o no lo firmamos nosotros. La capa web lo
-    traduce a 401 `token_invalid`; nunca dice cuál de esas causas fue."""
+    traduce a 401 `unauthenticated`; nunca dice cuál de esas causas fue."""
 
 
 def issue_access_token(

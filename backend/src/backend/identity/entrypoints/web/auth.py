@@ -249,7 +249,7 @@ def verify(request: fastapi.Request) -> fastapi.Response:
     if claims is None:
         return exception_handler.error_response(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            code="token_invalid",
+            code="unauthenticated",
             message="Sesión no válida o caducada.",
         )
     return fastapi.Response(

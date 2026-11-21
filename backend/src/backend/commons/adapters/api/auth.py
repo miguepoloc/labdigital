@@ -17,7 +17,7 @@ REFRESH_COOKIE = "ld_refresh"
 
 class NotAuthenticatedError(exceptions.UnauthorizedError):
     def __init__(self) -> None:
-        super().__init__("Sesión no válida o caducada.", code="token_invalid")
+        super().__init__("Sesión no válida o caducada.", code="unauthenticated")
 
 
 def claims_from_cookie(request: fastapi.Request) -> authentication.AccessClaims | None:

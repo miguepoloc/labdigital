@@ -29,15 +29,13 @@ class IssuedRefreshOutputDTO(dto.BaseDTO):
 
 
 class SessionOutputDTO(dto.BaseDTO):
-    """`Session` del contrato §4 (`GET /auth/sessions`)."""
+    """`Session` del contrato §6.1: `{id, user_agent, ip, created_at, last_used_at, current}`."""
 
     id: str
     user_agent: str
     ip: str
     created_at: str
     last_used_at: str
-    expires_at: str
-    persistent: bool
     current: bool
 
     @classmethod
@@ -48,7 +46,5 @@ class SessionOutputDTO(dto.BaseDTO):
             ip=session.ip,
             created_at=_iso(session.created_at),
             last_used_at=_iso(session.last_used_at),
-            expires_at=_iso(session.refresh_expires_at()),
-            persistent=session.persistent,
             current=str(session.id) == current_session_id,
         )

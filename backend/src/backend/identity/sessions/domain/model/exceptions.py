@@ -6,7 +6,7 @@ class RefreshTokenInvalidError(exceptions.UnauthorizedError):
     la causa ante el cliente)."""
 
     def __init__(self) -> None:
-        super().__init__("La sesión no es válida o ha caducado.", code="token_invalid")
+        super().__init__("La sesión no es válida o ha caducado.", code="unauthenticated")
 
 
 class SessionNotFoundError(exceptions.NotFoundError):

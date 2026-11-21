@@ -30,7 +30,7 @@ _STATUS_FOR: dict[type[exceptions.DomainError], int] = {
 # Para HTTPException que levanta el propio framework (rutas inexistentes, métodos).
 _CODE_FOR_STATUS: dict[int, tuple[str, str]] = {
     status.HTTP_400_BAD_REQUEST: ("bad_request", "Petición inválida."),
-    status.HTTP_401_UNAUTHORIZED: ("token_invalid", "Sesión no válida o caducada."),
+    status.HTTP_401_UNAUTHORIZED: ("unauthenticated", "Sesión no válida o caducada."),
     status.HTTP_403_FORBIDDEN: ("forbidden", "No tienes permiso para esta acción."),
     status.HTTP_404_NOT_FOUND: ("not_found", "Recurso no encontrado."),
     status.HTTP_405_METHOD_NOT_ALLOWED: ("method_not_allowed", "Método no permitido."),
@@ -75,13 +75,16 @@ def install(app: fastapi.FastAPI) -> None:
         if isinstance(error, exceptions.TooManyRequestsError):
             headers = {"Retry-After": str(error.retry_after_seconds)}
         http_status = status_for(error)
+        details = dict(error.details)
+        if http_status == status.HTTP_422_UNPROCESSABLE_CONTENT:
+            details = _with_fields(details, str(error))
         if http_status >= status.HTTP_500_INTERNAL_SERVER_ERROR:
             _LOGGER.error("Error de dominio no mapeado: %s (%s)", error.code, error)
         return error_response(
             status_code=http_status,
             code=error.code,
             message=str(error),
-            details=dict(error.details) or None,
+            details=details or None,
             headers=headers,
         )
 
@@ -89,14 +92,13 @@ def install(app: fastapi.FastAPI) -> None:
     async def _handle_validation_error(
         _request: fastapi.Request, error: fastapi_exceptions.RequestValidationError
     ) -> responses.JSONResponse:
-        fields = [
-            {
-                "loc": [str(part) for part in item.get("loc", ())],
-                "msg": str(item.get("msg", "")),
-                "type": str(item.get("type", "")),
-            }
-            for item in error.errors()
-        ]
+        fields: dict[str, str] = {}
+        for item in error.errors():
+            loc = [
+                str(part) for part in item.get("loc", ()) if part not in ("body", "query", "path")
+            ]
+            name = ".".join(loc) or "_"
+            fields.setdefault(name, _spanish_message(str(item.get("type", ""))))
         return error_response(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             code="validation_error",
@@ -126,3 +128,31 @@ def install(app: fastapi.FastAPI) -> None:
             code="internal_error",
             message="Error interno. Inténtalo más tarde.",
         )
+
+
+_TYPE_MESSAGES = {
+    "missing": "Campo obligatorio.",
+    "string_too_long": "Texto demasiado largo.",
+    "string_too_short": "Texto demasiado corto.",
+    "string_type": "Debe ser un texto.",
+    "bool_parsing": "Debe ser verdadero o falso.",
+    "bool_type": "Debe ser verdadero o falso.",
+    "int_parsing": "Debe ser un número entero.",
+    "int_type": "Debe ser un número entero.",
+    "dict_type": "Debe ser un objeto JSON.",
+    "json_invalid": "JSON mal formado.",
+    "model_attributes_type": "Debe ser un objeto JSON.",
+}
+
+
+def _spanish_message(error_type: str) -> str:
+    return _TYPE_MESSAGES.get(error_type, "Valor no válido.")
+
+
+def _with_fields(details: dict[str, Any], message: str) -> dict[str, Any]:
+    """Contrato §6.1: un 422 lleva `details.fields = {campo: mensaje en español}`. Los
+    errores de dominio declaran `details["field"]`; aquí se normaliza esa forma."""
+    if "fields" in details:
+        return details
+    field = str(details.pop("field", "_"))
+    return {"fields": {field: message}, **details}
