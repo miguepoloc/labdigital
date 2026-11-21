@@ -103,6 +103,14 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
 - `Session = { id, user_agent, ip, created_at, last_used_at, current: bool }`.
 - `PATCH /me` devuelve `Me`.
 - `next` es siempre la ruta completa con prefijo (`/labdigital/app/...`, `/labdigital/fpga/...`).
+- **Revisión de autosave** (tras LD-3): `Project` y la respuesta de `PUT /projects/{id}/autosave` incluyen `revision`
+  (entero que sube en CADA guardado, también cuando el autosave sobrescribe la versión abierta). El autosave envía
+  `{content, base_version, base_revision}`; si `base_revision` ≠ la actual ⇒ 409 `version_conflict` con
+  `details: {current_version, current_revision}`.
+- **Refresh concurrente**: reusar el refresh recién rotado dentro de **10 s** no revoca la familia (devuelve 204 con
+  cookies nuevas de la misma familia); fuera de esa ventana sí (robo). El frontend además serializa la renovación entre
+  pestañas con `navigator.locks.request("ld-refresh", …)` (si no existe, el candado por pestaña).
+- `POST /projects/{id}/versions` acepta cuerpo vacío.
 
 ## 7. API de integración del módulo FPGA (`window.JGFPGA`, PR a mcangen/JG-FPGA)
 
