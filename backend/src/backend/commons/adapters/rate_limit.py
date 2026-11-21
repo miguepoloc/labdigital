@@ -18,6 +18,10 @@ from backend.commons.adapters import orm_base
 from backend.commons.domain import rate_limits, value_objects
 
 
+def _now_seconds() -> int:
+    return value_objects.PosixTime.now().microseconds // 1_000_000
+
+
 class RateLimitRepository:
     def __init__(self, session: orm.Session) -> None:
         self._session = session
@@ -52,3 +56,70 @@ class RateLimitRepository:
             sa.delete(orm_base.RateLimitOrm).where(orm_base.RateLimitOrm.expires_at < now_seconds)
         )
         return int(getattr(result, "rowcount", 0) or 0)
+
+
+class BackoffRepository:
+    """Retardo creciente tras fallos consecutivos (`rate_limits.BackoffRule`). Igual que
+    `RateLimitRepository`: Postgres (global a los workers de uvicorn) y transacción PROPIA,
+    para que el fallo quede registrado aunque el caso de uso haga rollback."""
+
+    def __init__(self, session: orm.Session) -> None:
+        self._session = session
+
+    def retry_after(self, rule: rate_limits.BackoffRule, key: str) -> int | None:
+        """Segundos que faltan para poder reintentar, o `None` si no hay bloqueo."""
+        blocked_until = self._session.execute(
+            sa.select(orm_base.BackoffCounterOrm.blocked_until).where(
+                orm_base.BackoffCounterOrm.bucket == _bucket(rule, key)
+            )
+        ).scalar_one_or_none()
+        now = _now_seconds()
+        if blocked_until is None or blocked_until <= now:
+            return None
+        return blocked_until - now
+
+    def record_failure(self, rule: rate_limits.BackoffRule, key: str) -> int:
+        """Suma un fallo (o reinicia la cuenta si el último fue hace más de
+        `reset_after_seconds`) y fija el bloqueo. Devuelve el retardo impuesto (0 = ninguno).
+        `SELECT ... FOR UPDATE` tras un `INSERT ... ON CONFLICT DO NOTHING`: dos fallos
+        simultáneos se serializan y ambos cuentan."""
+        bucket = _bucket(rule, key)
+        now = _now_seconds()
+        self._session.execute(
+            postgresql.insert(orm_base.BackoffCounterOrm)
+            .values(bucket=bucket, failures=0, last_failure_at=now, blocked_until=0)
+            .on_conflict_do_nothing(index_elements=["bucket"])
+        )
+        row = self._session.execute(
+            sa.select(orm_base.BackoffCounterOrm)
+            .where(orm_base.BackoffCounterOrm.bucket == bucket)
+            .with_for_update()
+        ).scalar_one()
+        stale = now - row.last_failure_at > rule.reset_after_seconds
+        row.failures = 1 if stale else row.failures + 1
+        row.last_failure_at = now
+        delay = rule.delay_after(row.failures)
+        row.blocked_until = now + delay
+        self._session.flush()
+        return delay
+
+    def reset(self, rule: rate_limits.BackoffRule, key: str) -> None:
+        self._session.execute(
+            sa.delete(orm_base.BackoffCounterOrm).where(
+                orm_base.BackoffCounterOrm.bucket == _bucket(rule, key)
+            )
+        )
+
+    def prune(self, *, older_than_seconds: int = 86_400) -> int:
+        cutoff = _now_seconds() - older_than_seconds
+        result = self._session.execute(
+            sa.delete(orm_base.BackoffCounterOrm).where(
+                orm_base.BackoffCounterOrm.last_failure_at < cutoff,
+                orm_base.BackoffCounterOrm.blocked_until < _now_seconds(),
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+
+def _bucket(rule: rate_limits.BackoffRule, key: str) -> str:
+    return f"{rule.name}:{key}"

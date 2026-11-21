@@ -1,6 +1,10 @@
+import datetime
+
 import pytest
+import time_machine
 
 from backend.commons.domain import exceptions as commons_exceptions
+from backend.commons.domain import rate_limits
 from backend.identity.commons import value_objects as identity_value_objects
 from backend.identity.users.domain.model import exceptions, value_objects
 from backend.identity.users.services import dto, users
@@ -130,11 +134,59 @@ def test_login_errors() -> None:
 
 def test_login_rate_limited_per_ip_and_email() -> None:
     f = builders.build()
-    for _ in range(5):
-        with pytest.raises(exceptions.InvalidCredentialsError):
+    with time_machine.travel(_MINUTE_START, tick=False) as clock:
+        for _ in range(5):
+            with pytest.raises(exceptions.InvalidCredentialsError):
+                _login(f, email="nadie@example.com")
+            clock.shift(datetime.timedelta(seconds=9))  # deja pasar el retardo creciente
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
             _login(f, email="nadie@example.com")
-    with pytest.raises(commons_exceptions.TooManyRequestsError):
-        _login(f, email="nadie@example.com")
+
+
+_MINUTE_START = datetime.datetime(2030, 1, 7, 10, 0, 0, tzinfo=datetime.UTC)
+
+
+def test_login_backoff_grows_after_three_failures_and_resets_on_success() -> None:
+    f = builders.build()
+    _register(f)
+    _verify_latest(f)
+    with time_machine.travel(_MINUTE_START, tick=False) as clock:
+        for _ in range(3):
+            with pytest.raises(exceptions.InvalidCredentialsError):
+                _login(f, password="contrasena-incorrecta")
+        with pytest.raises(commons_exceptions.TooManyRequestsError) as blocked:
+            _login(f)  # ni siquiera la contraseña correcta pasa mientras dura el bloqueo
+        assert blocked.value.retry_after_seconds == 2
+        clock.shift(datetime.timedelta(seconds=2))
+        with pytest.raises(exceptions.InvalidCredentialsError):
+            _login(f, password="contrasena-incorrecta")  # 4.º fallo ⇒ 4 s
+        clock.shift(datetime.timedelta(seconds=1))
+        with pytest.raises(commons_exceptions.TooManyRequestsError) as blocked:
+            _login(f)
+        assert blocked.value.retry_after_seconds == 3
+        clock.shift(datetime.timedelta(seconds=60))  # nueva ventana del límite de 5/min
+        assert _login(f).me.email  # acierto: reinicia la cuenta
+        with pytest.raises(exceptions.InvalidCredentialsError):
+            _login(f, password="contrasena-incorrecta")
+        with pytest.raises(exceptions.InvalidCredentialsError):
+            _login(f, password="contrasena-incorrecta")  # 2 fallos: aún sin retardo
+
+
+def test_login_backoff_also_applies_to_unknown_emails() -> None:
+    """Si sólo las cuentas existentes se bloquearan, el 429 revelaría cuáles existen."""
+    f = builders.build()
+    with time_machine.travel(_MINUTE_START, tick=False):
+        for _ in range(3):
+            with pytest.raises(exceptions.InvalidCredentialsError):
+                _login(f, email="nadie@example.com")
+        with pytest.raises(commons_exceptions.TooManyRequestsError):
+            _login(f, email="nadie@example.com")
+
+
+def test_backoff_rule_delays() -> None:
+    rule = rate_limits.BackoffRule(name="x")
+    assert [rule.delay_after(n) for n in range(1, 8)] == [0, 0, 2, 4, 8, 16, 32]
+    assert rule.delay_after(40) == 900
 
 
 def test_forgot_password_is_silent_for_unknown_and_rate_limited() -> None:

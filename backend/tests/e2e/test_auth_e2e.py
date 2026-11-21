@@ -273,13 +273,36 @@ def test_csrf_rejects_mutations_without_header_or_same_origin(
 def test_login_rate_limit_returns_429_with_retry_after(env: e2e.Env) -> None:
     client = env.make_client()
     body = {"email": "brute@example.com", "password": "no-es-esta-1"}
-    statuses = [
-        client.post(f"{API}/auth/login", json=body, headers=CSRF).status_code for _ in range(5)
-    ]
-    assert statuses == [401] * 5
-    blocked = client.post(f"{API}/auth/login", json=body, headers=CSRF)
+    start = datetime.datetime(2030, 1, 7, 10, 0, 0, tzinfo=datetime.UTC)
+    with time_machine.travel(start, tick=False) as clock:
+        statuses = []
+        for _ in range(5):
+            statuses.append(client.post(f"{API}/auth/login", json=body, headers=CSRF).status_code)
+            clock.shift(datetime.timedelta(seconds=9))  # deja pasar el retardo creciente
+        assert statuses == [401] * 5
+        blocked = client.post(f"{API}/auth/login", json=body, headers=CSRF)
     assert blocked.status_code == 429 and blocked.json()["error"]["code"] == "rate_limited"
-    assert 1 <= int(blocked.headers["Retry-After"]) <= 60
+    assert int(blocked.headers["Retry-After"]) == 15
+
+
+def test_login_backoff_429_after_three_failures_with_growing_retry_after(env: e2e.Env) -> None:
+    env.signup("slow@example.com")
+    client = env.make_client()
+    wrong = {"email": "slow@example.com", "password": "no-es-esta-1", "remember": False}
+    right = {"email": "slow@example.com", "password": e2e.PASSWORD, "remember": False}
+    start = datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(minutes=5)
+    with time_machine.travel(start, tick=False) as clock:
+        for _ in range(3):
+            assert client.post(f"{API}/auth/login", json=wrong, headers=CSRF).status_code == 401
+        blocked = client.post(f"{API}/auth/login", json=right, headers=CSRF)
+        assert blocked.status_code == 429 and blocked.json()["error"]["code"] == "rate_limited"
+        assert blocked.headers["Retry-After"] == "2"
+        clock.shift(datetime.timedelta(seconds=2))
+        assert client.post(f"{API}/auth/login", json=wrong, headers=CSRF).status_code == 401
+        again = client.post(f"{API}/auth/login", json=right, headers=CSRF)
+        assert again.status_code == 429 and again.headers["Retry-After"] == "4"
+        clock.shift(datetime.timedelta(seconds=4))
+        assert client.post(f"{API}/auth/login", json=right, headers=CSRF).status_code == 200
 
 
 def test_forgot_password_rate_limit(env: e2e.Env) -> None:

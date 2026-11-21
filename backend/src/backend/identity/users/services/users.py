@@ -28,6 +28,9 @@ LOGIN_RULE = rate_limits.RateLimitRule(name="login", limit=5, window_seconds=60)
 REGISTER_RULE = rate_limits.RateLimitRule(name="register", limit=10, window_seconds=3600)
 FORGOT_RULE = rate_limits.RateLimitRule(name="forgot", limit=3, window_seconds=3600)
 RESEND_RULE = rate_limits.RateLimitRule(name="resend", limit=3, window_seconds=3600)
+# Retardo creciente (plan §Autenticación): tras 3 fallos seguidos por IP+correo, 2 s; luego
+# 4, 8, 16 s… (tope 15 min). Se suma al límite fijo de 5/min.
+LOGIN_BACKOFF = rate_limits.BackoffRule(name="login_backoff")
 
 _SYSTEM_ACTOR = audit.Actor(id=None, label="sistema")
 
@@ -148,23 +151,31 @@ def authenticate(
     input_dto: dto.LoginInputDTO,
     context: dto.RequestContext,
 ) -> dto.AuthenticatedUserOutputDTO:
-    """Comprueba credenciales (5 intentos/min por IP+correo). Orden de errores: credenciales
+    """Comprueba credenciales (5 intentos/min por IP+correo y retardo creciente tras 3
+    fallos seguidos: 429 `rate_limited` + `Retry-After`). Orden de errores: credenciales
     ⇒ `invalid_credentials` (401); sólo con la contraseña correcta se revela
-    `account_inactive`/`email_not_verified` (403). Re-hashea si los parámetros cambiaron."""
+    `account_inactive`/`email_not_verified` (403). Re-hashea si los parámetros cambiaron.
+
+    El retardo cuenta igual exista o no el correo (si no, el 429 revelaría qué cuentas
+    existen) y se registra en su propia transacción antes de lanzar el 401."""
     email = _email_or_none(input_dto.email)
-    _enforce_rate_limit(uow, LOGIN_RULE, f"{context.ip}|{email.value if email else '-'}")
-    if email is None:
-        value_objects.burn_password_check(input_dto.password)
-        raise exceptions.InvalidCredentialsError()
+    key = f"{context.ip}|{email.value if email else '-'}"
+    _enforce_backoff(uow, key)
+    _enforce_rate_limit(uow, LOGIN_RULE, key)
 
     failure: exceptions.InvalidCredentialsError | None = None
+    if email is None:
+        value_objects.burn_password_check(input_dto.password)
+        _record_login_failure(uow, key)
+        raise exceptions.InvalidCredentialsError()
+
     with uow.transaction():
         user_repo = uow.repo(aggregate.User)
         user = _find_by_email(uow, email)
         if user is None:
             value_objects.burn_password_check(input_dto.password)
-            raise exceptions.InvalidCredentialsError()
-        if not user.verify_password(input_dto.password):
+            failure = exceptions.InvalidCredentialsError()
+        elif not user.verify_password(input_dto.password):
             # Se audita y se confirma; el error se lanza fuera de la transacción.
             uow.audit.add(
                 _entry(
@@ -177,6 +188,7 @@ def authenticate(
             failure = exceptions.InvalidCredentialsError()
         else:
             user.ensure_can_log_in()
+            uow.backoff.reset(LOGIN_BACKOFF, key)
             if user.rehash_password_if_needed(input_dto.password):
                 user_repo.update(user)
                 uow.audit.add(
@@ -190,8 +202,9 @@ def authenticate(
                     changes={"ip": context.ip, "user_agent": context.user_agent[:200]},
                 )
             )
-    if failure is not None:
-        raise failure
+    if failure is not None or user is None:
+        _record_login_failure(uow, key)
+        raise failure or exceptions.InvalidCredentialsError()
     return dto.AuthenticatedUserOutputDTO(
         me=dto.MeOutputDTO.from_entity(user), claims=dto.TokenClaimsOutputDTO.from_entity(user)
     )
@@ -371,6 +384,18 @@ def _enforce_rate_limit(
         retry_after = uow.rate_limits.hit(rule, key)
     if retry_after is not None:
         raise commons_exceptions.TooManyRequestsError(retry_after_seconds=retry_after)
+
+
+def _enforce_backoff(uow: unit_of_work.UnitOfWork, key: str) -> None:
+    with uow.transaction():
+        retry_after = uow.backoff.retry_after(LOGIN_BACKOFF, key)
+    if retry_after is not None:
+        raise commons_exceptions.TooManyRequestsError(retry_after_seconds=retry_after)
+
+
+def _record_login_failure(uow: unit_of_work.UnitOfWork, key: str) -> None:
+    with uow.transaction():
+        uow.backoff.record_failure(LOGIN_BACKOFF, key)
 
 
 def _verify_and_maybe_promote(

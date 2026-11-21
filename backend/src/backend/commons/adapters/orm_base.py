@@ -102,3 +102,15 @@ class RateLimitOrm(Base):
     window_start: Mapped[int] = mapped_column(sa.BigInteger, primary_key=True)
     hits: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     expires_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, index=True)
+
+
+class BackoffCounterOrm(Base):
+    """Fallos consecutivos por clave (`<regla>:<clave>`) para el retardo creciente del login
+    (`commons.domain.rate_limits.BackoffRule`). Segundos POSIX."""
+
+    __tablename__ = "backoff_counters"
+
+    bucket: Mapped[str] = mapped_column(sa.Text, primary_key=True)
+    failures: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    last_failure_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, index=True)
+    blocked_until: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)

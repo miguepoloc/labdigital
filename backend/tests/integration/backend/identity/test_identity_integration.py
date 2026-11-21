@@ -168,14 +168,39 @@ def test_rate_limit_counter_survives_failed_logins(db: sa.Engine) -> None:
     """Postgres: el intento cuenta aunque el caso de uso haga rollback."""
     uow = unit_of_work.build()
     login = users_dto.LoginInputDTO(email="nadie@example.com", password="lo-que-sea-1")
-    for _ in range(5):
-        with pytest.raises(commons_exceptions.UnauthorizedError):
+    with time_machine.travel(_MINUTE_START, tick=False) as clock:
+        for _ in range(5):
+            with pytest.raises(commons_exceptions.UnauthorizedError):
+                users.authenticate(uow=uow, input_dto=login, context=builders.CONTEXT)
+            clock.shift(datetime.timedelta(seconds=9))  # deja pasar el retardo creciente
+        with pytest.raises(commons_exceptions.TooManyRequestsError) as info:
             users.authenticate(uow=uow, input_dto=login, context=builders.CONTEXT)
-    with pytest.raises(commons_exceptions.TooManyRequestsError) as info:
-        users.authenticate(uow=uow, input_dto=login, context=builders.CONTEXT)
-    assert 1 <= info.value.retry_after_seconds <= 60
+    assert info.value.retry_after_seconds == 15
     with db.connect() as conn:
         assert conn.execute(sa.select(orm_base.RateLimitOrm.hits)).scalar_one() == 6
+
+
+_MINUTE_START = datetime.datetime(2030, 1, 7, 10, 0, 0, tzinfo=datetime.UTC)
+
+
+def test_login_backoff_is_persisted_and_counted_in_postgres(db: sa.Engine) -> None:
+    uow, mailer = unit_of_work.build(), capturing.CapturingMailer()
+    _register_and_verify(uow, mailer)
+    wrong = users_dto.LoginInputDTO(email=_EMAIL, password="no-es-la-clave")
+    with time_machine.travel(_MINUTE_START, tick=False) as clock:
+        for _ in range(3):
+            with pytest.raises(commons_exceptions.UnauthorizedError):
+                users.authenticate(uow=uow, input_dto=wrong, context=builders.CONTEXT)
+        with pytest.raises(commons_exceptions.TooManyRequestsError) as info:
+            _login(uow)
+        assert info.value.retry_after_seconds == 2
+        with db.connect() as conn:
+            row = conn.execute(sa.select(orm_base.BackoffCounterOrm)).one()
+        assert row.failures == 3 and row.bucket.startswith("login_backoff:")
+        clock.shift(datetime.timedelta(seconds=2))
+        _login(uow)
+    with db.connect() as conn:
+        assert conn.execute(sa.select(orm_base.BackoffCounterOrm)).all() == []
 
 
 def test_duplicate_registration_race_is_absorbed(db: sa.Engine) -> None:

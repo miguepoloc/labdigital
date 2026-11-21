@@ -67,6 +67,10 @@ class UnitOfWork:
     def rate_limits(self) -> rate_limit_module.RateLimitRepository:
         return rate_limit_module.RateLimitRepository(self.session)
 
+    @property
+    def backoff(self) -> rate_limit_module.BackoffRepository:
+        return rate_limit_module.BackoffRepository(self.session)
+
     @contextlib.contextmanager
     def transaction(self, *, idempotency_key: str | None = None) -> Generator[None]:
         if self._session is not None:

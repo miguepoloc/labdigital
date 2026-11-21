@@ -9,7 +9,14 @@ from collections.abc import Generator
 import contextlib
 from typing import Any
 
-from backend.commons.domain import aggregates, audit, events, rate_limits, repositories
+from backend.commons.domain import (
+    aggregates,
+    audit,
+    events,
+    rate_limits,
+    repositories,
+    value_objects,
+)
 
 
 class FakeOutbox:
@@ -40,15 +47,48 @@ class FakeAuditRepository:
 
 
 class FakeRateLimits:
-    """Contador sin ventana temporal (suficiente para afirmar el límite)."""
+    """Ventana fija como `RateLimitRepository` (respeta `time_machine`)."""
 
     def __init__(self) -> None:
         self.hits: dict[str, int] = {}
 
     def hit(self, rule: rate_limits.RateLimitRule, key: str) -> int | None:
-        bucket = f"{rule.name}:{key}"
+        now = value_objects.PosixTime.now().microseconds // 1_000_000
+        window_start = now - now % rule.window_seconds
+        bucket = f"{rule.name}:{key}:{window_start}"
         self.hits[bucket] = self.hits.get(bucket, 0) + 1
-        return rule.window_seconds if self.hits[bucket] > rule.limit else None
+        if self.hits[bucket] > rule.limit:
+            return max(1, window_start + rule.window_seconds - now)
+        return None
+
+
+class FakeBackoff:
+    """Misma semántica que `BackoffRepository`, en memoria (respeta `time_machine`)."""
+
+    def __init__(self) -> None:
+        self.rows: dict[str, tuple[int, int, int]] = {}  # failures, last_failure, blocked_until
+
+    @staticmethod
+    def _now() -> int:
+        return value_objects.PosixTime.now().microseconds // 1_000_000
+
+    def retry_after(self, rule: rate_limits.BackoffRule, key: str) -> int | None:
+        row = self.rows.get(f"{rule.name}:{key}")
+        now = self._now()
+        if row is None or row[2] <= now:
+            return None
+        return row[2] - now
+
+    def record_failure(self, rule: rate_limits.BackoffRule, key: str) -> int:
+        bucket, now = f"{rule.name}:{key}", self._now()
+        failures, last, _ = self.rows.get(bucket, (0, now, 0))
+        failures = 1 if now - last > rule.reset_after_seconds else failures + 1
+        delay = rule.delay_after(failures)
+        self.rows[bucket] = (failures, now, now + delay)
+        return delay
+
+    def reset(self, rule: rate_limits.BackoffRule, key: str) -> None:
+        self.rows.pop(f"{rule.name}:{key}", None)
 
 
 class FakeUnitOfWork:
@@ -57,6 +97,7 @@ class FakeUnitOfWork:
         self.outbox = FakeOutbox()
         self.audit = FakeAuditRepository()
         self.rate_limits = FakeRateLimits()
+        self.backoff = FakeBackoff()
         self.transactions = 0
 
     def register(self, aggregate_type: type[aggregates.AggregateRoot[Any]], repo: Any) -> None:

@@ -44,7 +44,7 @@ def run_once(
 
 def prune_rate_limits(uow: unit_of_work.UnitOfWork) -> int:
     with uow.transaction():
-        return uow.rate_limits.prune()
+        return uow.rate_limits.prune() + uow.backoff.prune()
 
 
 def main() -> None:

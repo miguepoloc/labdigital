@@ -90,7 +90,7 @@ def postgres_url() -> Generator[str]:
 
 _TABLES = (
     "project_versions, projects, refresh_tokens, sessions, email_tokens, users, "
-    "outbox_events, audit_log, rate_limits, idempotency_keys"
+    "outbox_events, audit_log, rate_limits, backoff_counters, idempotency_keys"
 )
 
 
