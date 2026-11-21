@@ -2,7 +2,9 @@
 name: labdigital
 
 x-backend-env: &backend-env
-  APP_ENV: production
+  APP_ENV: prod
+  # Solo el gateway de la red labdigital (nginx del host llega por ahí) puede fijar X-Forwarded-For
+  FORWARDED_ALLOW_IPS: 172.31.88.1
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
   JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM}
   JWT_PUBLIC_KEY_PEM: ${JWT_PUBLIC_KEY_PEM}
@@ -20,6 +22,7 @@ x-backend-env: &backend-env
 
 services:
   db:
+    networks: [labdigital]
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -36,6 +39,7 @@ services:
     mem_limit: 1g
 
   api:
+    networks: [labdigital]
     build: ../backend
     image: labdigital-api:latest
     restart: unless-stopped
@@ -48,6 +52,7 @@ services:
     mem_limit: 1g
 
   worker:
+    networks: [labdigital]
     image: labdigital-api:latest           # misma imagen; otro comando (outbox -> correo)
     restart: unless-stopped
     depends_on: { db: { condition: service_healthy }, api: { condition: service_started } }
@@ -56,12 +61,20 @@ services:
     mem_limit: 512m
 
   web:
+    networks: [labdigital]
     build: ../frontend
     image: labdigital-web:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:8089:80"
     mem_limit: 256m
+
+networks:
+  labdigital:
+    ipam:
+      config:
+        - subnet: 172.31.88.0/24
+          gateway: 172.31.88.1
 
 volumes:
   db_data:
