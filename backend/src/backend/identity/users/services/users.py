@@ -362,6 +362,95 @@ def deactivate_user(
     return dto.MeOutputDTO.from_entity(user)
 
 
+# --------------------------------------------------------------------------------------
+# Directorio y administración
+# --------------------------------------------------------------------------------------
+
+
+def get_people(*, uow: unit_of_work.UnitOfWork, user_ids: list[str]) -> list[dto.PersonOutputDTO]:
+    """Nombre y correo de los ids válidos que existan (los demás se omiten)."""
+    ids = []
+    for raw in user_ids:
+        try:
+            ids.append(identity_value_objects.UserId(value=uuid.UUID(raw)))
+        except ValueError:
+            continue
+    with uow.transaction():
+        found = _user_repo(uow).list_by_ids(ids)
+    return [
+        dto.PersonOutputDTO(id=str(u.id), full_name=u.full_name.value, email=u.email.value)
+        for u in found
+    ]
+
+
+def require_admin(*, uow: unit_of_work.UnitOfWork, user_id: str) -> None:
+    """Comprueba el rol EN BD (no sólo el claim del access, que puede tener 15 min)."""
+    with uow.transaction():
+        try:
+            user = uow.repo(aggregate.User).get(_user_id(user_id))
+        except exceptions.UserNotFoundError as exc:
+            raise exceptions.AdminRequiredError() from exc
+    if not user.is_active or user.role is not identity_value_objects.Role.ADMIN:
+        raise exceptions.AdminRequiredError()
+
+
+def search_users(
+    *, uow: unit_of_work.UnitOfWork, query: str | None, limit: int = 50, offset: int = 0
+) -> list[dto.AdminUserOutputDTO]:
+    with uow.transaction():
+        found = _user_repo(uow).search(
+            (query or "").strip()[:200] or None,
+            limit=min(max(limit, 1), 200),
+            offset=max(offset, 0),
+        )
+    return [dto.AdminUserOutputDTO.from_entity(u) for u in found]
+
+
+def get_admin_view(*, uow: unit_of_work.UnitOfWork, user_id: str) -> dto.AdminUserOutputDTO:
+    with uow.transaction():
+        user = uow.repo(aggregate.User).get(_user_id(user_id))
+    return dto.AdminUserOutputDTO.from_entity(user)
+
+
+def activate_user(
+    *, uow: unit_of_work.UnitOfWork, user_id: str, actor: audit.Actor
+) -> dto.AdminUserOutputDTO:
+    with uow.transaction():
+        user_repo = uow.repo(aggregate.User)
+        user = user_repo.get(_user_id(user_id))
+        if user.activate():
+            user_repo.update(user)
+            uow.audit.add(_entry(user, value_objects.AuditAction.ACTIVATED, actor=actor))
+    return dto.AdminUserOutputDTO.from_entity(user)
+
+
+def change_role(
+    *, uow: unit_of_work.UnitOfWork, user_id: str, role: str, actor: audit.Actor
+) -> dto.AdminUserOutputDTO:
+    try:
+        new_role = identity_value_objects.Role(role)
+    except ValueError as exc:
+        raise commons_exceptions.ValidationError(
+            "El rol debe ser admin o user.", code="validation_error", details={"field": "role"}
+        ) from exc
+    with uow.transaction():
+        user_repo = uow.repo(aggregate.User)
+        user = user_repo.get(_user_id(user_id))
+        old_role = user.role
+        if old_role is not new_role:
+            user.change_role(new_role)
+            user_repo.update(user)
+            uow.audit.add(
+                _entry(
+                    user,
+                    value_objects.AuditAction.ROLE_CHANGED,
+                    actor=actor,
+                    changes={"role": {"old": old_role.value, "new": new_role.value}},
+                )
+            )
+    return dto.AdminUserOutputDTO.from_entity(user)
+
+
 def delete_expired_email_tokens(*, uow: unit_of_work.UnitOfWork) -> int:
     """Housekeeping (worker): borra tokens caducados hace más de un día."""
     cutoff = base_value_objects.PosixTime(

@@ -2,7 +2,9 @@
 ; Cada subcontexto nuevo recibe TODOS los contratos (no un subconjunto).
 ;
 ; Contextos: identity.users, identity.sessions (con identity.commons compartido y
-; orquestadores en identity.services) y projects.projects. `backend.entrypoints` es la raíz
+; orquestadores en identity.services), projects.projects, teaching.{courses,labs,submissions}
+; (con teaching.commons y orquestadores en teaching.services) y files.blobs. Lo que cruza
+; productos pasa por puertos cuyos adaptadores viven en backend.orchestrators. `backend.entrypoints` es la raíz
 ; de composición del proceso (app FastAPI única + worker).
 
 [importlinter]
@@ -21,6 +23,11 @@ source_modules =
     backend.identity.users.domain
     backend.identity.sessions.domain
     backend.projects.projects.domain
+    backend.teaching.commons
+    backend.teaching.courses.domain
+    backend.teaching.labs.domain
+    backend.teaching.submissions.domain
+    backend.files.blobs.domain
 forbidden_modules =
     fastapi
     starlette
@@ -56,6 +63,38 @@ layers =
     backend.projects.projects.adapters
     backend.projects.projects.domain
 
+[importlinter:contract:courses-layering]
+name = teaching.courses layering
+type = layers
+layers =
+    backend.teaching.courses.services
+    backend.teaching.courses.adapters
+    backend.teaching.courses.domain
+
+[importlinter:contract:labs-layering]
+name = teaching.labs layering
+type = layers
+layers =
+    backend.teaching.labs.services
+    backend.teaching.labs.adapters
+    backend.teaching.labs.domain
+
+[importlinter:contract:submissions-layering]
+name = teaching.submissions layering
+type = layers
+layers =
+    backend.teaching.submissions.services
+    backend.teaching.submissions.adapters
+    backend.teaching.submissions.domain
+
+[importlinter:contract:blobs-layering]
+name = files.blobs layering
+type = layers
+layers =
+    backend.files.blobs.services
+    backend.files.blobs.adapters
+    backend.files.blobs.domain
+
 ; ---------------------------------------------------------------------------
 ; Contrato 3 — Independencia de contextos. users <-> sessions sólo vía identity.commons o
 ; los orquestadores de identity.services. projects no conoce identity (y viceversa): el
@@ -69,11 +108,23 @@ modules =
     backend.identity.sessions
 
 [importlinter:contract:products-independence]
-name = identity/projects independence
+name = products independence (identity, projects, teaching, files)
 type = independence
 modules =
     backend.identity
     backend.projects
+    backend.teaching
+    backend.files
+
+; Subcontextos de teaching: sólo se hablan vía teaching.commons o los orquestadores de
+; teaching.services.
+[importlinter:contract:teaching-subcontexts-independence]
+name = teaching subcontexts independence
+type = independence
+modules =
+    backend.teaching.courses
+    backend.teaching.labs
+    backend.teaching.submissions
 
 ; ---------------------------------------------------------------------------
 ; Contrato 4 — commons (global y de producto) no importa productos.
@@ -86,6 +137,9 @@ source_modules =
 forbidden_modules =
     backend.identity
     backend.projects
+    backend.teaching
+    backend.files
+    backend.orchestrators
     backend.entrypoints
 
 [importlinter:contract:identity-commons-independence]
@@ -99,6 +153,18 @@ forbidden_modules =
     backend.identity.services
     backend.identity.entrypoints
 
+[importlinter:contract:teaching-commons-independence]
+name = teaching.commons independence
+type = forbidden
+source_modules =
+    backend.teaching.commons
+forbidden_modules =
+    backend.teaching.courses
+    backend.teaching.labs
+    backend.teaching.submissions
+    backend.teaching.services
+    backend.teaching.entrypoints
+
 ; ---------------------------------------------------------------------------
 ; Contrato 5 — Entrypoints delgados: servicios/orquestadores y commons, nunca agregados ni
 ; persistencia. (Importes DIRECTOS: allow_indirect_imports, ver §16.1.)
@@ -110,6 +176,8 @@ allow_indirect_imports = true
 source_modules =
     backend.identity.entrypoints
     backend.projects.entrypoints
+    backend.teaching.entrypoints
+    backend.files.entrypoints
     backend.entrypoints
 forbidden_modules =
     backend.identity.users.domain.model.aggregate
@@ -118,6 +186,15 @@ forbidden_modules =
     backend.identity.sessions.adapters
     backend.projects.projects.domain.model.aggregate
     backend.projects.projects.adapters
+    backend.teaching.courses.domain.model.aggregate
+    backend.teaching.courses.adapters
+    backend.teaching.labs.domain.model.aggregate
+    backend.teaching.labs.adapters
+    backend.teaching.submissions.domain.model.aggregate
+    backend.teaching.submissions.adapters
+    backend.files.blobs.domain.model.aggregate
+    backend.files.blobs.adapters.orm
+    backend.files.blobs.adapters.repository
 
 ; ---------------------------------------------------------------------------
 ; Contrato 6 — Orquestadores delgados: servicios + value_objects/exceptions sólo.
@@ -128,6 +205,7 @@ type = forbidden
 allow_indirect_imports = true
 source_modules =
     backend.identity.services
+    backend.teaching.services
     backend.orchestrators
 forbidden_modules =
     backend.identity.users.domain.model.aggregate
@@ -139,3 +217,14 @@ forbidden_modules =
     backend.identity.sessions.adapters
     backend.projects.projects.domain.model.aggregate
     backend.projects.projects.adapters
+    backend.teaching.courses.domain.model.aggregate
+    backend.teaching.courses.domain.model.events
+    backend.teaching.courses.adapters
+    backend.teaching.labs.domain.model.aggregate
+    backend.teaching.labs.domain.model.events
+    backend.teaching.labs.adapters
+    backend.teaching.submissions.domain.model.aggregate
+    backend.teaching.submissions.domain.model.events
+    backend.teaching.submissions.adapters
+    backend.files.blobs.domain.model.aggregate
+    backend.files.blobs.adapters

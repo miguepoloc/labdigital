@@ -23,3 +23,7 @@ class RoleChanged(domain_events.DomainEvent):
 
 class UserDeactivated(domain_events.IntegrationEvent):
     user_id: identity_value_objects.UserId
+
+
+class UserActivated(domain_events.DomainEvent):
+    user_id: identity_value_objects.UserId

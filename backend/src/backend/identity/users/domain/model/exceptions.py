@@ -64,3 +64,17 @@ class StaleCredentialsError(exceptions.UnauthorizedError):
 
     def __init__(self) -> None:
         super().__init__("Sesión no válida o caducada.", code="unauthenticated")
+
+
+class AdminRequiredError(exceptions.ForbiddenError):
+    def __init__(self) -> None:
+        super().__init__("Sólo un administrador puede hacer esto.", code="forbidden")
+
+
+class CannotModifySelfError(exceptions.ConflictError):
+    """Un admin no se desactiva ni se quita el rol a sí mismo (evita quedarse sin admins)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "No puedes desactivarte ni cambiar tu propio rol.", code="cannot_modify_self"
+        )

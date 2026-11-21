@@ -71,19 +71,33 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, *, max_bytes: int) -> None:
+    """`overrides`: límites propios por `(método, sufijo de ruta)`, p. ej. la subida de
+    archivos (`("POST", "/v1/files")` ⇒ 25 MB). El sufijo se compara con el final de la
+    ruta, así vale con y sin el prefijo `/labdigital/api`."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_bytes: int,
+        overrides: dict[tuple[str, str], int] | None = None,
+    ) -> None:
         super().__init__(app)
         self._max_bytes = max_bytes
+        self._overrides = overrides or {}
+
+    def _limit_for(self, method: str, path: str) -> int:
+        for (override_method, suffix), limit in self._overrides.items():
+            if method == override_method and path.rstrip("/").endswith(suffix):
+                return limit
+        return self._max_bytes
 
     async def dispatch(
         self, request: fastapi.Request, call_next: RequestResponseEndpoint
     ) -> Response:
         content_length = request.headers.get("content-length")
-        if (
-            content_length is not None
-            and content_length.isdigit()
-            and int(content_length) > self._max_bytes
-        ):
+        limit = self._limit_for(request.method, request.url.path)
+        if content_length is not None and content_length.isdigit() and int(content_length) > limit:
             return exception_handler.error_response(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 code="payload_too_large",

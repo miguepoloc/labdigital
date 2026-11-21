@@ -9,9 +9,13 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from backend.commons.adapters import orm_base, settings
+from backend.files.blobs.adapters import orm as blobs_orm  # noqa: F401
 from backend.identity.sessions.adapters import orm as sessions_orm  # noqa: F401
 from backend.identity.users.adapters import orm as users_orm  # noqa: F401
 from backend.projects.projects.adapters import orm as projects_orm  # noqa: F401
+from backend.teaching.courses.adapters import orm as courses_orm  # noqa: F401
+from backend.teaching.labs.adapters import orm as labs_orm  # noqa: F401
+from backend.teaching.submissions.adapters import orm as submissions_orm  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None and config.attributes.get("configure_logger", True):

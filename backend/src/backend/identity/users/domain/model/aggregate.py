@@ -121,6 +121,15 @@ class User(aggregates.AggregateRoot[identity_value_objects.UserId]):
         if not self.is_email_verified:
             raise exceptions.EmailNotVerifiedError()
 
+    def activate(self) -> bool:
+        """Idempotente; devuelve si cambió algo."""
+        if self.is_active:
+            return False
+        self.is_active = True
+        self.touch()
+        self.record_event(events.UserActivated(user_id=self.id))
+        return True
+
     def deactivate(self) -> None:
         """Idempotente."""
         if not self.is_active:

@@ -106,3 +106,33 @@ class TokenClaimsOutputDTO(dto.BaseDTO):
 class AuthenticatedUserOutputDTO(dto.BaseDTO):
     me: MeOutputDTO
     claims: TokenClaimsOutputDTO
+
+
+class PersonOutputDTO(dto.BaseDTO):
+    """Nombre y correo para mostrar a otros usuarios del mismo curso (directorio)."""
+
+    id: str
+    full_name: str
+    email: str
+
+
+class AdminUserOutputDTO(dto.BaseDTO):
+    id: str
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    email_verified: bool
+    created_at: str
+
+    @classmethod
+    def from_entity(cls, user: aggregate.User) -> Self:
+        return cls(
+            id=str(user.id),
+            email=user.email.value,
+            full_name=user.full_name.value,
+            role=user.role.value,
+            is_active=user.is_active,
+            email_verified=user.is_email_verified,
+            created_at=iso(user.created_at),
+        )

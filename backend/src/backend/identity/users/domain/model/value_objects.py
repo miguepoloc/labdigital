@@ -126,3 +126,4 @@ class AuditAction(enum.StrEnum):
     ROLE_CHANGED = enum.auto()
     PROFILE_UPDATED = enum.auto()
     DEACTIVATED = enum.auto()
+    ACTIVATED = enum.auto()

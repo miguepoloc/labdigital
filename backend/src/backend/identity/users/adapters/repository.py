@@ -75,6 +75,26 @@ class DefaultUserRepository(repositories.Repository[aggregate.User]):
             raise exceptions.UserNotFoundError(identifier=email)
         return _to_entity(row)
 
+    def list_by_ids(self, ids: list[identity_value_objects.UserId]) -> list[aggregate.User]:
+        if not ids:
+            return []
+        stmt = sa.select(orm.UserOrm).where(orm.UserOrm.id.in_([i.value for i in ids]))
+        return [_to_entity(row) for row in self._session.scalars(stmt)]
+
+    def search(self, query: str | None, *, limit: int, offset: int) -> list[aggregate.User]:
+        """Por correo o nombre (subcadena, sin distinguir mayúsculas)."""
+        stmt = sa.select(orm.UserOrm).order_by(orm.UserOrm.created_at.desc())
+        if query:
+            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            stmt = stmt.where(
+                sa.or_(
+                    orm.UserOrm.email.ilike(pattern, escape="\\"),
+                    orm.UserOrm.full_name.ilike(pattern, escape="\\"),
+                )
+            )
+        return [_to_entity(row) for row in self._session.scalars(stmt.limit(limit).offset(offset))]
+
     def add(self, user: aggregate.User) -> None:
         """UUIDv7: no hace falta `insert_with_id_retry`. Un correo duplicado (carrera entre
         dos registros simultáneos) se traduce a `UserAlreadyExistsError` dentro de un

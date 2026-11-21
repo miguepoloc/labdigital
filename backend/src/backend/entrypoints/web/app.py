@@ -12,14 +12,23 @@ import sqlalchemy as sa
 
 from backend.commons.adapters import engine, logs
 from backend.commons.adapters.api import exception_handler, middleware
+from backend.files.entrypoints.web import files as files_web
+from backend.identity.entrypoints.web import admin as identity_admin
 from backend.identity.entrypoints.web import auth as identity_auth
 from backend.identity.entrypoints.web import me as identity_me
+from backend.orchestrators import ports as cross_ports
 from backend.projects.entrypoints.web import projects as projects_web
+from backend.teaching.entrypoints.web import _dependencies as teaching_deps
+from backend.teaching.entrypoints.web import courses as teaching_courses
+from backend.teaching.entrypoints.web import labs as teaching_labs
+from backend.teaching.entrypoints.web import submissions as teaching_submissions
 
 ROOT_PATH = "/labdigital/api"
 API_PREFIX = "/v1"
 # 2 MB de contenido de proyecto + margen de JSON/escapes. nginx limita también.
 MAX_BODY_BYTES = 3 * 1024 * 1024
+# `POST /v1/files`: 25 MB por archivo + margen del multipart (el servicio corta a 25 MB).
+MAX_UPLOAD_BODY_BYTES = 25 * 1024 * 1024 + 256 * 1024
 
 _LOGGER = logs.get_logger()
 
@@ -35,7 +44,11 @@ def create_app() -> fastapi.FastAPI:
     )
     # Orden: el último añadido es el más externo.
     app.add_middleware(middleware.CsrfMiddleware)
-    app.add_middleware(middleware.BodySizeLimitMiddleware, max_bytes=MAX_BODY_BYTES)
+    app.add_middleware(
+        middleware.BodySizeLimitMiddleware,
+        max_bytes=MAX_BODY_BYTES,
+        overrides={("POST", f"{API_PREFIX}/files"): MAX_UPLOAD_BODY_BYTES},
+    )
     app.add_middleware(middleware.RequestLoggingMiddleware)
     exception_handler.install(app)
 
@@ -43,7 +56,18 @@ def create_app() -> fastapi.FastAPI:
     v1.include_router(identity_auth.router)
     v1.include_router(identity_auth.wellknown_router)
     v1.include_router(identity_me.router)
+    v1.include_router(identity_admin.router)
     v1.include_router(projects_web.router)
+    v1.include_router(teaching_courses.router)
+    v1.include_router(teaching_labs.router)
+    v1.include_router(teaching_submissions.router)
+    v1.include_router(files_web.router)
+
+    # Puertos entre productos (ver `backend.orchestrators.ports`).
+    app.dependency_overrides[teaching_deps.get_user_directory] = cross_ports.IdentityUserDirectory
+    app.dependency_overrides[teaching_deps.get_projects_port] = cross_ports.ProjectsAdapter
+    app.dependency_overrides[teaching_deps.get_files_port] = cross_ports.FilesAdapter
+    app.dependency_overrides[files_web.get_access_policy] = cross_ports.TeachingBlobAccessPolicy
 
     @v1.get("/health", tags=["health"])
     def health() -> responses.JSONResponse:
