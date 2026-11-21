@@ -8,18 +8,28 @@ function ana() {
   return projectsState()
 }
 
+/** Proyectos visibles de la usuaria demo, como los ordena la lista (más reciente primero). */
+function visible(st: ReturnType<typeof projectsState>) {
+  const me = st.projects.find((p) => p.name === 'Semáforo')!.ownerId
+  return st.projects
+    .filter((p) => p.ownerId === me && !p.deleted_at)
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+}
+
 describe('ProjectsListPage (/app/proyectos)', () => {
   it('lista los proyectos con módulo y última edición (más reciente primero)', async () => {
-    ana()
+    const st = ana()
+    const mine = visible(st)
     const { wrapper } = await renderAt('/app/proyectos')
     const items = wrapper.findAll('[data-test="project-item"]')
-    expect(items).toHaveLength(2)
-    expect(items[0]!.text()).toContain('Semáforo')
+    expect(items).toHaveLength(mine.length)
+    mine.forEach((p, i) => expect(items[i]!.text()).toContain(p.name))
     expect(items[0]!.text()).toContain('FPGA')
     expect(items[0]!.text()).toContain('Última edición:')
-    expect(items[1]!.text()).toContain('Contador BCD')
-    expect(items[0]!.find('[data-test="open"]').attributes('href')).toMatch(
-      /^\/labdigital\/app\/fpga\/0190p-/,
+    expect(wrapper.text()).toContain('Semáforo')
+    expect(wrapper.text()).toContain('Contador BCD')
+    expect(items[0]!.find('[data-test="open"]').attributes('href')).toBe(
+      `/labdigital/app/fpga/${mine[0]!.id}`,
     )
     wrapper.unmount()
   })
@@ -44,18 +54,20 @@ describe('ProjectsListPage (/app/proyectos)', () => {
 
   it('no crea sin nombre', async () => {
     const st = ana()
+    const before = st.projects.length
     const { wrapper } = await renderAt('/app/proyectos')
     await wrapper.find('[data-test="create-form"]').trigger('submit')
     await settle()
     expect(wrapper.text()).toContain('Este campo es obligatorio.')
-    expect(st.projects).toHaveLength(2)
+    expect(st.projects).toHaveLength(before)
     wrapper.unmount()
   })
 
   it('renombra en la propia fila', async () => {
     const st = ana()
     const { wrapper } = await renderAt('/app/proyectos')
-    const first = () => wrapper.findAll('[data-test="project-item"]')[0]!
+    const first = () =>
+      wrapper.findAll('[data-test="project-item"]').find((r) => r.text().includes('Semáforo'))!
     await first().find('[data-test="rename"]').trigger('click')
     await first().find('input[name="rename"]').setValue('Semáforo peatonal')
     await first().find('[data-test="rename-form"]').trigger('submit')
@@ -70,14 +82,16 @@ describe('ProjectsListPage (/app/proyectos)', () => {
     const st = ana()
     const { wrapper } = await renderAt('/app/proyectos')
     const target = st.projects.find((p) => p.name === 'Semáforo')!
-    const row = () => wrapper.findAll('[data-test="project-item"]')[0]!
+    const before = visible(st).length
+    const row = () =>
+      wrapper.findAll('[data-test="project-item"]').find((r) => r.text().includes('Semáforo'))!
     await row().find('[data-test="remove"]').trigger('click')
     expect(row().find('[data-test="confirm-remove"]').text()).toContain('¿Borrar «Semáforo»?')
     expect(target.deleted_at).toBeNull()
     await row().find('[data-test="confirm-remove-yes"]').trigger('click')
     await settle()
     expect(target.deleted_at).not.toBeNull()
-    expect(wrapper.findAll('[data-test="project-item"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-test="project-item"]')).toHaveLength(before - 1)
     expect(wrapper.find('[data-test="status"]').text()).toContain('«Semáforo» borrado')
     wrapper.unmount()
   })

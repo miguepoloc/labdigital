@@ -21,6 +21,7 @@ import {
   type ProjectVersionDetail,
 } from '@/api/projects'
 import { currentUser, db } from './db'
+import { cdb } from './db.courses'
 
 const A = config.apiBase
 const MAX_BYTES = 2 * 1024 * 1024
@@ -150,7 +151,38 @@ function seed(): ProjectsState {
     '2026-11-06T09:30:00Z',
   ).id
   st.projects.push(bcd, sem)
+  addCourseDemoProjects(st)
   return st
+}
+
+/** Los proyectos de ejemplo de los mocks de cursos (LD-8b) viven aquí también, con los mismos ids, para que
+ * la lista de proyectos, el diálogo de entrega y la revisión vean los mismos datos. */
+function addCourseDemoProjects(st: ProjectsState): void {
+  for (const cp of cdb.projects) {
+    if (st.projects.some((p) => p.id === cp.id) || cp.versions.length === 0) continue
+    const versions: MockVersion[] = cp.versions.map((v) => ({
+      id: v.id,
+      n: v.n,
+      kind: v.kind === 'autosave' ? 'autosave' : 'manual',
+      label: v.label,
+      content: fpga(cp.name, '  led <= sw;'),
+      size: v.size,
+      created_at: v.created_at,
+      updated_at: v.created_at,
+    }))
+    st.projects.push({
+      id: cp.id,
+      ownerId: cp.owner_id,
+      name: cp.name,
+      module: 'fpga',
+      created_at: versions[0]!.created_at,
+      updated_at: cp.updated_at,
+      deleted_at: null,
+      currentId: versions[versions.length - 1]!.id,
+      revision: versions.length,
+      versions,
+    })
+  }
 }
 
 /** Estado de proyectos del `db` vigente (se crea con la semilla la primera vez). */

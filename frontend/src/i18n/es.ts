@@ -6,7 +6,10 @@ import { projects } from './es.projects'
  * y elegir el diccionario en `i18n/index.ts`.
  * Interpolación: `{nombre}` se sustituye por el parámetro del mismo nombre.
  */
+import { esCourses } from './es.courses'
+
 export const es = {
+  ...esCourses,
   app: {
     name: 'LabDigital',
     fullName: 'LabDigital GIDEAM',

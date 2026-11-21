@@ -1,8 +1,10 @@
 import { createPinia } from 'pinia'
+import { defineAsyncComponent } from 'vue'
 import { ViteSSG } from 'vite-ssg'
 import App from './App.vue'
 import { installGuards, installSessionExpiry } from './router/guards'
 import { routes } from './router/routes'
+import { registerFpgaSubmitDialog } from './pages/app/fpga/extensions'
 import './styles/tokens.css'
 import './styles/base.css'
 import './styles/forms.css'
@@ -11,6 +13,11 @@ import './styles/forms.css'
  * Punto de entrada (vite-ssg): en build se prerenderizan las rutas de `PRERENDERED_ROUTES`
  * (vite.config.ts); en el navegador se monta la SPA normal.
  */
+// Diálogo de entrega (LD-8b) dentro del envoltorio FPGA (LD-9)
+registerFpgaSubmitDialog(
+  defineAsyncComponent(() => import('./pages/app/submissions/FpgaSubmitDialog.vue')),
+)
+
 export const createApp = ViteSSG(
   App,
   {

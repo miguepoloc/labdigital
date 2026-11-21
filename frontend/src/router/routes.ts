@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import type { MessageKey } from '@/i18n'
 import LandingPage from '@/pages/LandingPage.vue'
 import { projectRoutes } from './routes.projects'
+import { courseRoutes } from './routes.courses'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -82,6 +83,7 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/app/SessionsPage.vue'),
         meta: { title: 'sessions.title' },
       },
+      ...courseRoutes,
     ],
   },
   ...projectRoutes,
