@@ -111,6 +111,28 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
   cookies nuevas de la misma familia); fuera de esa ventana sí (robo). El frontend además serializa la renovación entre
   pestañas con `navigator.locks.request("ld-refresh", …)` (si no existe, el candado por pestaña).
 - `POST /projects/{id}/versions` acepta cuerpo vacío.
+- **Formas de proyecto** (tras LD-8/9): `ProjectSummary = {id, name, module, current_version_id, current_version_n,
+  revision, created_at, updated_at}`; `Project = ProjectSummary + {content}`; `ProjectVersion = {id, n, kind:
+  autosave|manual|submitted, label|null, size (bytes), created_at, updated_at}`. `POST /projects/{id}/versions` y
+  `POST .../restore` devuelven `Project` (con la `revision` nueva).
+- `GET /submissions/{id}` incluye `content` (proyecto congelado) y `version_id`.
+- **Formas de cursos y entregas** (tras LD-8b):
+  `Course = {id, name, period, description, archived_at|null, owner_id, owner_name, my_role: docente|estudiante,
+  my_status: pending|active|rejected|removed, join_code (sólo si my_role=docente), counts: {students, pending, labs}}`;
+  `POST /courses/join` devuelve `Course`.
+  `Lab = {…campos de creación, id, course_id, published_at|null, my_submission: SubmissionSummary|null}`.
+  `Team = {id, lab_id, name, locked, members: [{id, full_name}], join_code (sólo miembros y docente)}`;
+  docente: `POST /teams/{id}/unlock` además de `lock`.
+  `SubmissionSummary = {id, attempt, status, is_late, submitted_at, grade|null}`;
+  `Submission = SubmissionSummary + {lab_id, project_id, version_id, version_n, submitted_by: {id, full_name},
+  team: {id, name}|null, members: [{id, full_name}], files: [{id, kind, name, size, mime}],
+  reviews: [{id, reviewer_name, grade|null, comment, returned_for_resubmission, created_at}], content}`.
+  `grade` es la de la última revisión con nota. En `pass_fail`, la nota es `1` (aprobado) o `0` (no aprobado).
+- **Códigos 409 nuevos**: `deadline_passed`, `already_member`, `team_full`, `team_locked`, `already_in_team`,
+  `team_required`, `resubmission_not_allowed`, `lab_not_open`; `invalid_code` es 404.
+- **Cookie indicadora** `ld_session=1` (NO HttpOnly, `Secure; SameSite=Lax; Path=/labdigital/`, misma vida que
+  `ld_refresh`): se pone en login/refresh y se borra en logout o al revocar. Sólo evita que páginas públicas pidan
+  `/me` sin sesión; nunca se usa para autorizar.
 
 ## 7. API de integración del módulo FPGA (`window.JGFPGA`, PR a mcangen/JG-FPGA)
 

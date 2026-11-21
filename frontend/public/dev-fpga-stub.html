@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JG FPGA (stub de desarrollo)</title>
+    <!--
+      SÓLO DESARROLLO (LD-9): imita la API window.JGFPGA de JG FPGA (docs/EMBED.md, rama feat/api-integracion)
+      para probar el envoltorio /app/fpga con MSW sin el módulo real. Se activa con
+      VITE_FPGA_URL=/labdigital/dev-fpga-stub.html y postbuild.mjs lo borra del build.
+    -->
+    <style>
+      body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: #0e1622; color: #e8eef5; }
+      header { display: flex; gap: 12px; align-items: center; padding: 8px 12px; background: #0b6b3a; }
+      header b { font-family: ui-monospace, monospace; }
+      main { display: grid; gap: 8px; padding: 12px; }
+      label { display: grid; gap: 4px; }
+      textarea { min-height: 10rem; font: 13px/1.4 ui-monospace, monospace; background: #16202e; color: inherit; border: 1px solid #2a3646; border-radius: 6px; padding: 8px; }
+      input { font: inherit; background: #16202e; color: inherit; border: 1px solid #2a3646; border-radius: 6px; padding: 4px 8px; }
+      .ro { color: #ff9400; font-weight: 600; }
+      .log { font: 12px ui-monospace, monospace; color: #9fb0c2; white-space: pre-wrap; }
+      button { font: inherit; }
+    </style>
+    <script src="dev-fpga-stub.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <b>JG FPGA · stub</b>
+      <input id="projName" aria-label="Nombre en el módulo" />
+      <span id="ro" class="ro" hidden>🔒 Solo lectura</span>
+      <button id="addFile" type="button">+ archivo</button>
+    </header>
+    <main id="files"></main>
+    <div id="log" class="log"></div>
+  </body>
+</html>
