@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
     depends_on: { db: { condition: service_healthy }, api: { condition: service_started } }
     environment: *backend-env
-    command: ${WORKER_COMMAND:-python -m backend.entrypoints.worker}
+    command: ${WORKER_COMMAND:-python -m backend.entrypoints.worker.main}
     mem_limit: 512m
 
   web:
