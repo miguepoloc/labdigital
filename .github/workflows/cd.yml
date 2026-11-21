@@ -1,0 +1,23 @@
+# CD: despliega en el servidor (runner self-hosted) cuando el workflow "CI" termina bien en main.
+name: CD
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: deploy-produccion
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: [self-hosted, alunaia, labdigital]
+    environment: produccion
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - run: bash deploy/deploy.sh
