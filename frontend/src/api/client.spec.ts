@@ -210,3 +210,43 @@ describe('cliente API: 401 de dominio', () => {
     expect(onSessionExpired).not.toHaveBeenCalled()
   })
 })
+
+describe('cliente API: renovación serializada entre pestañas (Web Locks)', () => {
+  it('con navigator.locks pide el candado "ld-refresh" y renueva dentro de él', async () => {
+    signIn()
+    expireAccess()
+    const names: string[] = []
+    let insideLock = false
+    const request = vi.fn(async (name: string, fn: () => Promise<unknown>) => {
+      names.push(name)
+      insideLock = true
+      try {
+        return await fn()
+      } finally {
+        insideLock = false
+      }
+    })
+    let refreshedInside = false
+    server.events.on('request:start', ({ request: r }) => {
+      if (r.url.endsWith('/auth/refresh')) refreshedInside = insideLock
+    })
+    Object.defineProperty(navigator, 'locks', { value: { request }, configurable: true })
+    try {
+      await expect(refreshSession()).resolves.toBe(true)
+      expect(names).toEqual(['ld-refresh'])
+      expect(refreshedInside).toBe(true)
+    } finally {
+      delete (navigator as unknown as { locks?: unknown }).locks
+      server.events.removeAllListeners()
+    }
+  })
+
+  it('sin navigator.locks usa el candado por pestaña (una sola renovación)', async () => {
+    signIn()
+    expireAccess()
+    expect('locks' in navigator).toBe(false)
+    const [a, b] = await Promise.all([refreshSession(), refreshSession()])
+    expect(a && b).toBe(true)
+    expect(db.calls.refresh).toBe(1)
+  })
+})

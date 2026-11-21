@@ -94,12 +94,23 @@ async function send(path: string, opts: RequestOptions): Promise<Response> {
 }
 
 /**
+ * Serializa la renovación entre pestañas con Web Locks (`ld-refresh`, contrato §6.1); sin Web Locks, sólo el
+ * candado por pestaña (`refreshInFlight`).
+ */
+function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
+  if (locks && typeof locks.request === 'function')
+    return locks.request('ld-refresh', fn) as unknown as Promise<T>
+  return fn()
+}
+
+/**
  * Renueva la sesión con `POST /auth/refresh`. Las llamadas concurrentes comparten la misma promesa.
  * Devuelve `true` si el servidor emitió cookies nuevas.
  */
 export function refreshSession(): Promise<boolean> {
   if (!refreshInFlight) {
-    refreshInFlight = send('/auth/refresh', { method: 'POST' })
+    refreshInFlight = withRefreshLock(() => send('/auth/refresh', { method: 'POST' }))
       .then((res) => {
         if (res.ok) refreshGeneration++
         return res.ok
