@@ -92,10 +92,37 @@ def test_refresh_rotates_and_reuse_revokes_family(env: e2e.Env) -> None:
     attacker.cookies.set(
         "ld_refresh", old_refresh, domain="testserver.local", path="/labdigital/api/v1/auth/"
     )
-    reused = attacker.post(f"{API}/auth/refresh", headers=CSRF)
-    assert reused.status_code == 401 and reused.json()["error"]["code"] == "unauthenticated"
-    # la familia completa quedó revocada: el refresh legítimo tampoco sirve ya
-    assert client.post(f"{API}/auth/refresh", headers=CSRF).status_code == 401
+    later = datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=11)
+    with time_machine.travel(later):
+        reused = attacker.post(f"{API}/auth/refresh", headers=CSRF)
+        assert reused.status_code == 401 and reused.json()["error"]["code"] == "unauthenticated"
+        # la familia completa quedó revocada: el refresh legítimo tampoco sirve ya
+        assert client.post(f"{API}/auth/refresh", headers=CSRF).status_code == 401
+
+
+def test_concurrent_refresh_within_ten_seconds_returns_new_cookies_same_family(
+    env: e2e.Env,
+) -> None:
+    client = env.signup("tabs@example.com")
+    shared = client.cookies.get("ld_refresh")
+    assert client.post(f"{API}/auth/refresh", headers=CSRF).status_code == 204
+    tab_a_refresh = client.cookies.get("ld_refresh")
+
+    other_tab = env.make_client()
+    other_tab.cookies.set(
+        "ld_refresh", shared, domain="testserver.local", path="/labdigital/api/v1/auth/"
+    )
+    grace = other_tab.post(f"{API}/auth/refresh", headers=CSRF)
+    assert grace.status_code == 204
+    issued = _cookies(grace)
+    assert {"ld_access", "ld_refresh"} <= set(issued)
+    tab_b_refresh = other_tab.cookies.get("ld_refresh")
+    assert tab_b_refresh not in (shared, tab_a_refresh)
+    assert other_tab.get(f"{API}/me").status_code == 200
+    # misma familia: una sola sesión activa, y sigue viva
+    sessions = other_tab.get(f"{API}/auth/sessions").json()
+    assert len(sessions) == 1
+    assert other_tab.post(f"{API}/auth/refresh", headers=CSRF).status_code == 204
 
 
 def test_logout_revokes_session_and_clears_cookies(env: e2e.Env) -> None:

@@ -34,7 +34,8 @@ def start_session(
 def rotate(
     *, uow: unit_of_work.UnitOfWork, refresh_token: str, ip: str, user_agent: str
 ) -> dto.IssuedRefreshOutputDTO:
-    """Canjea un refresh. Reuso ⇒ la familia queda revocada y auditada (se CONFIRMA) y
+    """Canjea un refresh. Reuso del token recién rotado dentro de 10 s ⇒ token nuevo de la
+    misma familia (pestañas concurrentes, contrato §6.1). Reuso fuera de esa ventana ⇒ la familia queda revocada y auditada (se CONFIRMA) y
     después se lanza `RefreshTokenInvalidError`. No llamar dentro de una transacción
     exterior: el rollback desharía la revocación."""
     opaque = value_objects.OpaqueRefreshToken.parse(refresh_token)
@@ -53,6 +54,9 @@ def rotate(
         match redemption.outcome:
             case value_objects.RedeemOutcome.ROTATED:
                 repo.update(session)
+            case value_objects.RedeemOutcome.ROTATED_IN_GRACE:
+                repo.update(session)
+                _LOGGER.info("Refresh concurrente dentro de la ventana de gracia [%s]", session.id)
             case value_objects.RedeemOutcome.REUSED:
                 repo.update(session)
                 uow.audit.add(

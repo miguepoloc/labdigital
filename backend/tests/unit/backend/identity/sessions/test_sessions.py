@@ -13,6 +13,10 @@ pytestmark = pytest.mark.unit
 _USER = identity_value_objects.UserId.new()
 
 
+def _after_grace() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=11)
+
+
 def _start(persistent: bool = True) -> tuple[aggregate.Session, value_objects.OpaqueRefreshToken]:
     return aggregate.Session.start(
         user_id=_USER, credentials_version=1, persistent=persistent, user_agent="ua", ip="1.1.1.1"
@@ -35,7 +39,8 @@ def test_redeem_old_token_is_reuse_and_revokes_family() -> None:
     session.redeem(presented=old, secret=opaque.secret, ip="x", user_agent="x")
     rotated_old = old.model_copy(update={"rotated_at": session.updated_at})
 
-    result = session.redeem(presented=rotated_old, secret=opaque.secret, ip="x", user_agent="x")
+    with time_machine.travel(_after_grace()):
+        result = session.redeem(presented=rotated_old, secret=opaque.secret, ip="x", user_agent="x")
 
     assert result.outcome is value_objects.RedeemOutcome.REUSED
     assert session.is_revoked and session.revoke_reason is value_objects.RevokeReason.REFRESH_REUSE
@@ -75,7 +80,7 @@ def test_service_rotation_and_reuse_detection_with_audit() -> None:
     second = sessions.rotate(uow=f.uow, refresh_token=first.refresh_token, ip="i", user_agent="u")  # type: ignore[arg-type]
     assert second.refresh_token != first.refresh_token and second.session_id == first.session_id
 
-    with pytest.raises(exceptions.RefreshTokenInvalidError):
+    with time_machine.travel(_after_grace()), pytest.raises(exceptions.RefreshTokenInvalidError):
         sessions.rotate(uow=f.uow, refresh_token=first.refresh_token, ip="i", user_agent="u")  # type: ignore[arg-type]
     assert "refresh_reuse_detected" in f.uow.audit.actions()
     # la familia entera cayó: el token "bueno" tampoco sirve
@@ -110,3 +115,31 @@ def test_revoke_others_keeps_current_and_ownership_is_enforced() -> None:
             owner_user_id=str(identity_value_objects.UserId.new()),
             reason=value_objects.RevokeReason.REVOKED_BY_USER,
         )
+
+
+def test_redeem_just_rotated_token_within_grace_rotates_same_family() -> None:
+    session, opaque = _start()
+    old = session.current_token
+    first = session.redeem(presented=old, secret=opaque.secret, ip="x", user_agent="x")
+    rotated_old = old.model_copy(update={"rotated_at": session.updated_at})
+    with time_machine.travel(
+        datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=9)
+    ):
+        again = session.redeem(presented=rotated_old, secret=opaque.secret, ip="x", user_agent="x")
+    assert again.outcome is value_objects.RedeemOutcome.ROTATED_IN_GRACE
+    assert again.new_token is not None and first.new_token is not None
+    assert again.new_token.token_id not in (first.new_token.token_id, old.id)
+    assert session.current_token.id == again.new_token.token_id and not session.is_revoked
+
+
+def test_service_concurrent_refresh_within_grace_keeps_family_alive() -> None:
+    f = builders.build()
+    first = _service_start(f)
+    tab_a = sessions.rotate(uow=f.uow, refresh_token=first.refresh_token, ip="i", user_agent="u")  # type: ignore[arg-type]
+    tab_b = sessions.rotate(uow=f.uow, refresh_token=first.refresh_token, ip="i", user_agent="u")  # type: ignore[arg-type]
+    assert tab_b.session_id == tab_a.session_id == first.session_id
+    assert tab_b.refresh_token not in (tab_a.refresh_token, first.refresh_token)
+    assert "refresh_reuse_detected" not in f.uow.audit.actions()
+    # la familia sigue viva: el último token funciona
+    later = sessions.rotate(uow=f.uow, refresh_token=tab_b.refresh_token, ip="i", user_agent="u")  # type: ignore[arg-type]
+    assert later.session_id == first.session_id

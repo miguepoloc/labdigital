@@ -82,14 +82,19 @@ class Session(aggregates.AggregateRoot[value_objects.SessionId]):
         - secreto incorrecto ⇒ INVALID sin tocar nada (quien sólo conoce el id no puede
           cerrar sesiones ajenas);
         - sesión revocada o token caducado ⇒ INVALID;
-        - token ya rotado ⇒ REUSED y la sesión queda revocada;
+        - token ya rotado hace ≤ `REUSE_GRACE` (10 s) ⇒ ROTATED_IN_GRACE: otra pestaña
+          renovó a la vez; se emite un token nuevo de la MISMA familia (contrato §6.1);
+        - token ya rotado fuera de esa ventana ⇒ REUSED y la sesión queda revocada;
         - token vigente ⇒ ROTATED con un nuevo token.
         """
         if not hmac.compare_digest(value_objects.hash_secret(secret), presented.token_hash):
             return Redemption(outcome=value_objects.RedeemOutcome.INVALID)
         if self.is_revoked:
             return Redemption(outcome=value_objects.RedeemOutcome.INVALID)
-        if presented.id != self.current_token.id or presented.rotated_at is not None:
+        is_current = presented.id == self.current_token.id and presented.rotated_at is None
+        if not is_current and self._within_reuse_grace(presented):
+            return self._rotate(ip=ip, user_agent=user_agent, in_grace=True)
+        if not is_current:
             self.revoke(value_objects.RevokeReason.REFRESH_REUSE)
             self.record_event(
                 events.RefreshTokenReuseDetected(
@@ -97,6 +102,17 @@ class Session(aggregates.AggregateRoot[value_objects.SessionId]):
                 )
             )
             return Redemption(outcome=value_objects.RedeemOutcome.REUSED)
+        return self._rotate(ip=ip, user_agent=user_agent, in_grace=False)
+
+    def _within_reuse_grace(self, presented: value_objects.RefreshTokenRecord) -> bool:
+        if presented.rotated_at is None:
+            return False
+        limit = base_value_objects.PosixTime.from_datetime(
+            presented.rotated_at.to_datetime() + value_objects.REUSE_GRACE
+        )
+        return base_value_objects.PosixTime.now() <= limit
+
+    def _rotate(self, *, ip: str, user_agent: str, in_grace: bool) -> Redemption:
         now = base_value_objects.PosixTime.now()
         if self.current_token.expires_at <= now:
             return Redemption(outcome=value_objects.RedeemOutcome.INVALID)
@@ -106,7 +122,12 @@ class Session(aggregates.AggregateRoot[value_objects.SessionId]):
         self.ip = ip
         self.user_agent = user_agent[:_USER_AGENT_MAX]
         self.touch()
-        return Redemption(outcome=value_objects.RedeemOutcome.ROTATED, new_token=opaque)
+        outcome = (
+            value_objects.RedeemOutcome.ROTATED_IN_GRACE
+            if in_grace
+            else value_objects.RedeemOutcome.ROTATED
+        )
+        return Redemption(outcome=outcome, new_token=opaque)
 
     def revoke(self, reason: value_objects.RevokeReason) -> bool:
         """Idempotente; devuelve si cambió algo."""

@@ -1,7 +1,10 @@
 """Integración con Postgres real: servicios + repositorios + UoW + outbox + worker."""
 
+import datetime
+
 import pytest
 import sqlalchemy as sa
+import time_machine
 
 from backend.commons.adapters import orm_base, unit_of_work
 from backend.commons.domain import exceptions as commons_exceptions
@@ -92,7 +95,10 @@ def test_rotation_and_reuse_revokes_family_in_db(db: sa.Engine) -> None:
         uow=uow, refresh_token=first, context=builders.CONTEXT
     ).refresh.refresh_token
 
-    with pytest.raises(sessions_exceptions.RefreshTokenInvalidError):
+    with (
+        time_machine.travel(_after_grace()),
+        pytest.raises(sessions_exceptions.RefreshTokenInvalidError),
+    ):
         refresh_orchestrator.refresh(uow=uow, refresh_token=first, context=builders.CONTEXT)
     with pytest.raises(sessions_exceptions.RefreshTokenInvalidError):
         refresh_orchestrator.refresh(uow=uow, refresh_token=second, context=builders.CONTEXT)
@@ -104,6 +110,28 @@ def test_rotation_and_reuse_revokes_family_in_db(db: sa.Engine) -> None:
     assert session_row.revoke_reason == "refresh_reuse"
     assert len(tokens) == 2 and all(t.revoked_at is not None for t in tokens)
     assert {"login_succeeded", "refresh_reuse_detected", "email_verified"} <= set(audit_actions)
+
+
+def test_concurrent_refresh_within_grace_does_not_revoke_family(db: sa.Engine) -> None:
+    uow, mailer = unit_of_work.build(), capturing.CapturingMailer()
+    _register_and_verify(uow, mailer)
+    first = _login(uow).tokens.refresh.refresh_token
+    tab_a = refresh_orchestrator.refresh(uow=uow, refresh_token=first, context=builders.CONTEXT)
+    tab_b = refresh_orchestrator.refresh(uow=uow, refresh_token=first, context=builders.CONTEXT)
+    assert tab_a.refresh.session_id == tab_b.refresh.session_id
+    # ambas pestañas siguen con una sesión viva: el último token de la familia funciona
+    refresh_orchestrator.refresh(
+        uow=uow, refresh_token=tab_b.refresh.refresh_token, context=builders.CONTEXT
+    )
+    with db.connect() as conn:
+        session_row = conn.execute(sa.select(sessions_orm.SessionOrm)).one()
+        tokens = conn.execute(sa.select(sessions_orm.RefreshTokenOrm)).all()
+    assert session_row.revoked_at is None and len(tokens) == 4
+    assert sum(1 for t in tokens if t.rotated_at is None) == 1
+
+
+def _after_grace() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(seconds=11)
 
 
 def test_reset_password_revokes_every_session(db: sa.Engine) -> None:

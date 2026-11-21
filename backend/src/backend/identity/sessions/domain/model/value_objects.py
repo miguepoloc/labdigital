@@ -11,6 +11,9 @@ PERSISTENT_TTL = datetime.timedelta(days=30)
 # tras 24 h sin uso (cada rotación lo renueva).
 EPHEMERAL_TTL = datetime.timedelta(hours=24)
 _SECRET_BYTES = 32
+# Contrato §6.1 "Refresh concurrente": reusar el refresh recién rotado dentro de esta ventana
+# (dos pestañas renovando a la vez) no es robo; fuera de ella sí.
+REUSE_GRACE = datetime.timedelta(seconds=10)
 
 
 class SessionId(value_objects.UuidV7Id):
@@ -62,6 +65,8 @@ class OpaqueRefreshToken(value_objects.ValueObject):
 
 class RedeemOutcome(enum.StrEnum):
     ROTATED = enum.auto()
+    # Refresh ya rotado presentado dentro de `REUSE_GRACE`: se emite otro de la misma familia.
+    ROTATED_IN_GRACE = enum.auto()
     REUSED = enum.auto()
     INVALID = enum.auto()
 
