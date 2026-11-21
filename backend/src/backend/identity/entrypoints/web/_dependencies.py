@@ -76,6 +76,22 @@ def set_refresh_cookie(
         httponly=True,
         samesite="strict",
     )
+    set_session_indicator_cookie(response, max_age=max_age)
+
+
+def set_session_indicator_cookie(response: fastapi.Response, *, max_age: int | None) -> None:
+    """`ld_session=1`: NO HttpOnly (la SPA la lee para no pedir `/me` sin sesión), Secure,
+    SameSite=Lax, Path=/labdigital/, misma vida que `ld_refresh` (contrato §6.1). Jamás se
+    usa para autorizar: la autorización es sólo `ld_access`."""
+    response.set_cookie(
+        api_auth.SESSION_COOKIE,
+        "1",
+        max_age=max_age,
+        path=_access_path(),
+        secure=settings.get_settings().cookie_secure,
+        httponly=False,
+        samesite="lax",
+    )
 
 
 def clear_auth_cookies(response: fastapi.Response) -> None:
@@ -89,4 +105,7 @@ def clear_auth_cookies(response: fastapi.Response) -> None:
         secure=secure,
         httponly=True,
         samesite="strict",
+    )
+    response.delete_cookie(
+        api_auth.SESSION_COOKIE, path=_access_path(), secure=secure, httponly=False, samesite="lax"
     )

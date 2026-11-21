@@ -57,6 +57,30 @@ def test_login_sets_cookies_with_exact_contract_flags(env: e2e.Env) -> None:
     refresh_value = cookies["ld_refresh"].split(";")[0].split("=", 1)[1]
     token_id, secret = refresh_value.split(".", 1)
     assert len(token_id) == 36 and len(secret) > 30
+    # Indicador `ld_session=1` (contrato §6.1): legible por JS, misma vida que ld_refresh.
+    indicator = _attrs(cookies["ld_session"])
+    assert cookies["ld_session"].startswith("ld_session=1;")
+    assert {"secure", "samesite=lax", "path=/labdigital/", max_age} <= indicator
+    assert "httponly" not in indicator
+
+
+def test_session_indicator_cookie_follows_refresh_and_is_cleared(env: e2e.Env) -> None:
+    client = env.signup("flag@example.com", remember=False)
+    refreshed = client.post(f"{API}/auth/refresh", headers=CSRF)
+    indicator = _attrs(_cookies(refreshed)["ld_session"])
+    assert "httponly" not in indicator
+    assert not any(a.startswith(("max-age", "expires")) for a in indicator)  # como ld_refresh
+    # Nunca autoriza: sólo con ld_session no hay acceso.
+    only_flag = env.make_client()
+    only_flag.cookies.set("ld_session", "1", domain="testserver.local", path="/labdigital/")
+    assert only_flag.get(f"{API}/me").status_code == 401
+    logout = client.post(f"{API}/auth/logout", headers=CSRF)
+    assert "max-age=0" in _attrs(_cookies(logout)["ld_session"])
+
+    other = env.login("flag@example.com")
+    current = next(s for s in other.get(f"{API}/auth/sessions").json() if s["current"])
+    revoked = other.delete(f"{API}/auth/sessions/{current['id']}", headers=CSRF)
+    assert "max-age=0" in _attrs(_cookies(revoked)["ld_session"])
 
 
 def test_remember_false_makes_refresh_a_session_cookie(env: e2e.Env) -> None:

@@ -13,6 +13,8 @@ from backend.commons.domain import exceptions
 
 ACCESS_COOKIE = "ld_access"
 REFRESH_COOKIE = "ld_refresh"
+# Indicador NO HttpOnly (contrato §6.1): sólo dice a la SPA que hay sesión; nunca autoriza.
+SESSION_COOKIE = "ld_session"
 
 
 class NotAuthenticatedError(exceptions.UnauthorizedError):
