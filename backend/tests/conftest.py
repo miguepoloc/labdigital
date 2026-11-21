@@ -69,8 +69,10 @@ users_value_objects._HASHER = argon2.PasswordHasher(time_cost=1, memory_cost=8, 
 def postgres_url() -> Generator[str]:
     from testcontainers.postgres import PostgresContainer  # noqa: PLC0415
 
+    # Prefijo configurable para que varias ramas/agentes en el mismo host no se pisen.
+    prefix = os.environ.get("LD_TEST_CONTAINER_PREFIX", "ld-test-pg")
     container = PostgresContainer("postgres:16-alpine", driver="psycopg").with_name(
-        f"ld-test-pg-{secrets.token_hex(4)}"
+        f"{prefix}-{secrets.token_hex(4)}"
     )
     with container as postgres:
         url = postgres.get_connection_url()

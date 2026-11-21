@@ -34,6 +34,7 @@ class RenameProjectBody(base_dto.BaseDTO):
 class AutosaveBody(base_dto.BaseDTO):
     content: dict[str, Any]
     base_version: int
+    base_revision: int | None = None
 
 
 class ManualVersionBody(base_dto.BaseDTO):
@@ -90,7 +91,11 @@ def autosave(
         uow=uow,
         owner_id=claims.user_id,
         project_id=project_id,
-        input_dto=dto.AutosaveInputDTO(content=body.content, base_version=body.base_version),
+        input_dto=dto.AutosaveInputDTO(
+            content=body.content,
+            base_version=body.base_version,
+            base_revision=body.base_revision,
+        ),
     )
 
 

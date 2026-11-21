@@ -34,6 +34,14 @@ class FakeProjectRepository(repositories.Repository[aggregate.Project]):
             raise exceptions.ProjectVersionNotFoundError()
         return version.model_copy(deep=True)
 
+    def get_version_by_id(
+        self, version_id: value_objects.ProjectVersionId
+    ) -> aggregate.ProjectVersion:
+        version = self.versions.get(version_id)
+        if version is None:
+            raise exceptions.ProjectVersionNotFoundError()
+        return version.model_copy(deep=True)
+
     def list_versions(self, project_id: value_objects.ProjectId) -> list[aggregate.VersionSummary]:
         return sorted(
             (v.summary() for v in self.versions.values() if v.project_id == project_id),

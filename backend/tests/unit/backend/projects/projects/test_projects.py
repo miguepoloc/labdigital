@@ -59,7 +59,8 @@ def test_autosave_overwrites_open_version_within_ten_minutes() -> None:
     project = _create(uow)
     first = _autosave(uow, project.id, 1, "a")
     second = _autosave(uow, project.id, 1, "b")
-    assert first == second and first.n == 1
+    assert (first.version_id, first.n) == (second.version_id, 1)
+    assert second.revision == first.revision + 1
     assert len(repo.versions) == 1
     detail = projects.get_project(uow=uow, owner_id=OWNER, project_id=project.id)  # type: ignore[arg-type]
     assert detail.content["files"][0]["text"] == "b"  # type: ignore[index]
@@ -144,3 +145,60 @@ def test_content_validation() -> None:
             owner_id=OWNER,
             input_dto=dto.CreateProjectInputDTO(name="x", module="arduino", content=content()),
         )  # type: ignore[arg-type]
+
+
+def test_revision_rises_on_every_save_and_stale_revision_conflicts() -> None:
+    uow, _ = _build()
+    project = _create(uow)
+    assert project.revision == 1
+    first = projects.autosave(
+        uow=uow,  # type: ignore[arg-type]
+        owner_id=OWNER,
+        project_id=project.id,
+        input_dto=dto.AutosaveInputDTO(content=content("a"), base_version=1, base_revision=1),
+    )
+    second = _autosave(uow, project.id, 1, "b")  # sin base_revision: compatibilidad
+    assert (first.n, first.revision) == (1, 2) and (second.n, second.revision) == (1, 3)
+    with pytest.raises(exceptions.VersionConflictError) as info:
+        projects.autosave(
+            uow=uow,  # type: ignore[arg-type]
+            owner_id=OWNER,
+            project_id=project.id,
+            input_dto=dto.AutosaveInputDTO(content=content("c"), base_version=1, base_revision=2),
+        )
+    assert info.value.details == {
+        "current_version": 1,
+        "current_revision": 3,
+        "current_version_id": first.version_id,
+    }
+    manual = projects.create_manual_version(
+        uow=uow, owner_id=OWNER, project_id=project.id, label=None
+    )  # type: ignore[arg-type]
+    detail = projects.get_project(uow=uow, owner_id=OWNER, project_id=project.id)  # type: ignore[arg-type]
+    assert manual.n == 1 and detail.revision == 4
+
+
+def test_frozen_version_is_never_overwritten_by_autosave() -> None:
+    uow, repo = _build()
+    project = _create(uow)
+    _autosave(uow, project.id, 1, "entregado")
+    frozen = projects.freeze_version(
+        uow=uow, owner_id=OWNER, project_id=project.id, version_id=None
+    )  # type: ignore[arg-type]
+    assert frozen.n == 1
+    again = projects.freeze_version(
+        uow=uow, owner_id=OWNER, project_id=project.id, version_id=frozen.version_id
+    )  # type: ignore[arg-type]
+    assert again == frozen  # idempotente
+    after = _autosave(uow, project.id, 1, "sigo editando")  # dentro de la ventana de 10 min
+    assert after.n == 2
+    _autosave(uow, project.id, 2, "y más")
+    content_of_frozen = projects.get_frozen_version(uow=uow, version_id=frozen.version_id)  # type: ignore[arg-type]
+    assert content_of_frozen.content["files"][0]["text"] == "entregado"  # type: ignore[index]
+    head = projects.get_project(uow=uow, owner_id=OWNER, project_id=project.id)  # type: ignore[arg-type]
+    assert head.content["files"][0]["text"] == "y más"  # type: ignore[index]
+    with pytest.raises(exceptions.VersionNotFrozenError):
+        projects.get_frozen_version(uow=uow, version_id=after.version_id)  # type: ignore[arg-type]
+    with pytest.raises(exceptions.ProjectNotFoundError):
+        projects.freeze_version(uow=uow, owner_id=OTHER, project_id=project.id, version_id=None)  # type: ignore[arg-type]
+    assert len(repo.versions) == 2

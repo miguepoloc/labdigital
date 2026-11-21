@@ -18,6 +18,7 @@ class CreateProjectInputDTO(dto.BaseDTO):
 class AutosaveInputDTO(dto.BaseDTO):
     content: dict[str, Any]
     base_version: int
+    base_revision: int | None = None
 
 
 class VersionOutputDTO(dto.BaseDTO):
@@ -26,6 +27,7 @@ class VersionOutputDTO(dto.BaseDTO):
     kind: str
     label: str | None
     size: int
+    locked: bool
     created_at: str
     updated_at: str
 
@@ -37,6 +39,7 @@ class VersionOutputDTO(dto.BaseDTO):
             kind=summary.kind.value,
             label=summary.label,
             size=summary.size,
+            locked=summary.locked,
             created_at=_iso(summary.created_at),
             updated_at=_iso(summary.updated_at),
         )
@@ -57,6 +60,7 @@ class ProjectOutputDTO(dto.BaseDTO):
     id: str
     name: str
     module: str
+    revision: int
     current_version: VersionOutputDTO
     created_at: str
     updated_at: str
@@ -67,6 +71,7 @@ class ProjectOutputDTO(dto.BaseDTO):
             id=str(project.id),
             name=project.name.value,
             module=project.module.value,
+            revision=project.revision,
             current_version=VersionOutputDTO.from_summary(project.head),
             created_at=_iso(project.created_at),
             updated_at=_iso(project.updated_at),
@@ -87,3 +92,18 @@ class ProjectDetailOutputDTO(ProjectOutputDTO):
 class AutosaveOutputDTO(dto.BaseDTO):
     version_id: str
     n: int
+    revision: int
+
+
+class FrozenVersionOutputDTO(dto.BaseDTO):
+    """Versión bloqueada para una entrega (la referencia que guarda `submissions`)."""
+
+    project_id: str
+    project_name: str
+    version_id: str
+    n: int
+    size: int
+
+
+class FrozenContentOutputDTO(FrozenVersionOutputDTO):
+    content: dict[str, Any]

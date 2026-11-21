@@ -21,6 +21,7 @@ def _summary(row: orm.ProjectVersionOrm) -> aggregate.VersionSummary:
         kind=value_objects.VersionKind(row.kind),
         label=row.label,
         size=row.size,
+        locked=row.locked,
         created_at=_posix(row.created_at),
         updated_at=_posix(row.updated_at),
     )
@@ -34,6 +35,7 @@ def _to_entity(row: orm.ProjectOrm, head: orm.ProjectVersionOrm) -> aggregate.Pr
         name=value_objects.ProjectName(value=row.name),
         head=_summary(head),
         last_n=row.last_n,
+        revision=row.revision,
         deleted_at=None if row.deleted_at is None else _posix(row.deleted_at),
         created_at=_posix(row.created_at),
         updated_at=_posix(row.updated_at),
@@ -49,6 +51,7 @@ def _to_orm(project: aggregate.Project) -> orm.ProjectOrm:
         name=project.name.value,
         current_version_id=project.head.id.value,
         last_n=project.last_n,
+        revision=project.revision,
         deleted_at=None if project.deleted_at is None else project.deleted_at.microseconds,
         created_at=project.created_at.microseconds,
         updated_at=project.updated_at.microseconds,
@@ -65,6 +68,7 @@ def _version_to_orm(version: aggregate.ProjectVersion) -> orm.ProjectVersionOrm:
         label=version.label,
         content=version.content.data,
         size=version.content.size,
+        locked=version.locked,
         created_at=version.created_at.microseconds,
         updated_at=version.updated_at.microseconds,
     )
@@ -78,6 +82,7 @@ def _version_to_entity(row: orm.ProjectVersionOrm) -> aggregate.ProjectVersion:
         kind=value_objects.VersionKind(row.kind),
         label=row.label,
         content=value_objects.ProjectContent(data=dict(row.content), size=row.size),
+        locked=row.locked,
         created_at=_posix(row.created_at),
         updated_at=_posix(row.updated_at),
     )
@@ -119,6 +124,15 @@ class DefaultProjectRepository(repositories.Repository[aggregate.Project]):
             raise exceptions.ProjectVersionNotFoundError()
         return _version_to_entity(row)
 
+    def get_version_by_id(
+        self, version_id: value_objects.ProjectVersionId
+    ) -> aggregate.ProjectVersion:
+        """Sin comprobar el proyecto: sólo para leer versiones congeladas (entregas)."""
+        row = self._session.get(orm.ProjectVersionOrm, version_id.value)
+        if row is None:
+            raise exceptions.ProjectVersionNotFoundError()
+        return _version_to_entity(row)
+
     def list_versions(self, project_id: value_objects.ProjectId) -> list[aggregate.VersionSummary]:
         stmt = (
             sa.select(orm.ProjectVersionOrm)
@@ -151,8 +165,37 @@ class DefaultProjectRepository(repositories.Repository[aggregate.Project]):
             self._session.delete(row)
 
     def _write_versions(self, project: aggregate.Project) -> None:
+        """Inserta las versiones nuevas y actualiza las existentes SÓLO si no están
+        bloqueadas (`WHERE locked = false`): si una entrega bloqueó la versión abierta
+        mientras este autoguardado estaba en vuelo, no se toca y se responde 409."""
         for version in project.pull_pending_versions():
-            self._session.merge(_version_to_orm(version))
+            exists = self._session.execute(
+                sa.select(orm.ProjectVersionOrm.id).where(
+                    orm.ProjectVersionOrm.id == version.id.value
+                )
+            ).first()
+            if exists is None:
+                self._session.add(_version_to_orm(version))
+                self._session.flush()
+                continue
+            result = self._session.execute(
+                sa.update(orm.ProjectVersionOrm)
+                .where(
+                    orm.ProjectVersionOrm.id == version.id.value,
+                    orm.ProjectVersionOrm.locked.is_(False),
+                )
+                .values(
+                    kind=version.kind.value,
+                    label=version.label,
+                    content=version.content.data,
+                    size=version.content.size,
+                    locked=version.locked,
+                    updated_at=version.updated_at.microseconds,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if int(getattr(result, "rowcount", 0) or 0) != 1:
+                raise project.conflict()
         self._session.flush()
 
 

@@ -78,9 +78,13 @@ def autosave(
         repo = _repo(uow)
         project = _get_accessible(repo, owner_id, project_id)
         content = value_objects.ProjectContent.for_module(project.module, input_dto.content)
-        head = project.autosave(content=content, base_version=input_dto.base_version)
+        head = project.autosave(
+            content=content,
+            base_version=input_dto.base_version,
+            base_revision=input_dto.base_revision,
+        )
         repo.update(project)
-    return dto.AutosaveOutputDTO(version_id=str(head.id), n=head.n)
+    return dto.AutosaveOutputDTO(version_id=str(head.id), n=head.n, revision=project.revision)
 
 
 def create_manual_version(
@@ -128,6 +132,49 @@ def restore_version(
         project.restore(version=version)
         repo.update(project)
     return dto.ProjectDetailOutputDTO.from_entity_and_content(project, version.content.data)
+
+
+def freeze_version(
+    *, uow: unit_of_work.UnitOfWork, owner_id: str, project_id: str, version_id: str | None
+) -> dto.FrozenVersionOutputDTO:
+    """Bloquea una versión del proyecto (la actual si `version_id` es `None`) para que una
+    entrega la referencie. Idempotente. Sólo el dueño del proyecto."""
+    with uow.transaction():
+        repo = _repo(uow)
+        project = _get_accessible(repo, owner_id, project_id)
+        target = project.head.id if version_id is None else _version_id(version_id)
+        version = repo.get_version(project.id, target)
+        summary = project.freeze(version=version)
+        repo.update(project)
+    return dto.FrozenVersionOutputDTO(
+        project_id=str(project.id),
+        project_name=project.name.value,
+        version_id=str(summary.id),
+        n=summary.n,
+        size=summary.size,
+    )
+
+
+def get_frozen_version(
+    *, uow: unit_of_work.UnitOfWork, version_id: str
+) -> dto.FrozenContentOutputDTO:
+    """Contenido de una versión BLOQUEADA, sin comprobar el dueño: lo usa la revisión de
+    entregas, que ya autorizó al lector en `teaching`. Una versión no bloqueada ⇒ 404, así
+    esta puerta no sirve para leer proyectos ajenos en curso."""
+    with uow.transaction():
+        repo = _repo(uow)
+        version = repo.get_version_by_id(_version_id(version_id))
+        if not version.locked:
+            raise exceptions.VersionNotFrozenError()
+        project = repo.get(version.project_id)
+    return dto.FrozenContentOutputDTO(
+        project_id=str(project.id),
+        project_name=project.name.value,
+        version_id=str(version.id),
+        n=version.n,
+        size=version.content.size,
+        content=version.content.data,
+    )
 
 
 def _get_accessible(

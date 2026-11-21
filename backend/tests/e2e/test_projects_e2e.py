@@ -35,6 +35,7 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
     assert saved.status_code == 200 and saved.json() == {
         "version_id": project["current_version"]["id"],
         "n": 1,
+        "revision": 2,
     }
 
     manual = client.post(
@@ -56,6 +57,10 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
     assert conflict.status_code == 409
     error = conflict.json()["error"]
     assert error["code"] == "version_conflict" and error["details"]["current_version"] == 2
+    assert (
+        error["details"]["current_revision"]
+        == client.get(f"{API}/projects/{pid}").json()["revision"]
+    )
 
     versions = client.get(f"{API}/projects/{pid}/versions").json()
     assert [v["n"] for v in versions] == [2, 1] and "content" not in versions[0]
@@ -132,3 +137,28 @@ def test_project_content_limits(env: e2e.Env) -> None:
         headers={**CSRF, "Content-Type": "application/json"},
     )
     assert huge.status_code == 413
+
+
+def test_autosave_revision_detects_two_tabs_on_the_same_open_version(env: e2e.Env) -> None:
+    client = env.signup("tabs@example.com")
+    project = _create(client)
+    pid = project["id"]
+    assert project["revision"] == 1
+    tab_a = client.put(
+        f"{API}/projects/{pid}/autosave",
+        json={"content": unit_projects.content("a"), "base_version": 1, "base_revision": 1},
+        headers=CSRF,
+    )
+    assert tab_a.status_code == 200 and tab_a.json()["revision"] == 2
+    # La pestaña B editó sobre la revisión 1 (misma versión abierta n=1): conflicto.
+    tab_b = client.put(
+        f"{API}/projects/{pid}/autosave",
+        json={"content": unit_projects.content("b"), "base_version": 1, "base_revision": 1},
+        headers=CSRF,
+    )
+    assert tab_b.status_code == 409
+    error = tab_b.json()["error"]
+    assert error["code"] == "version_conflict"
+    assert error["details"]["current_version"] == 1 and error["details"]["current_revision"] == 2
+    detail = client.get(f"{API}/projects/{pid}").json()
+    assert detail["revision"] == 2 and detail["content"]["files"][0]["text"] == "a"

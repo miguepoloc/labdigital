@@ -36,6 +36,8 @@ class ProjectOrm(orm_base.Base, orm_base.TimestampsMixin):
         nullable=False,
     )
     last_n: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    # Contrato §6.1: sube en cada guardado de contenido.
+    revision: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default="1")
     deleted_at: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
     version: Mapped[int] = mapped_column(default=0)
 
@@ -56,3 +58,5 @@ class ProjectVersionOrm(orm_base.Base, orm_base.TimestampsMixin):
     # `deferred`: listar versiones no carga hasta 2 MB por fila.
     content: Mapped[dict] = deferred(mapped_column(JSONB, nullable=False))
     size: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    # Entregada: el contenido ya no puede cambiar (trigger `project_versions_locked_guard`).
+    locked: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=sa.false())
