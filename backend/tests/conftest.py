@@ -12,6 +12,8 @@
 from collections.abc import Generator
 import os
 import secrets
+import shutil
+import tempfile
 
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
@@ -57,9 +59,14 @@ os.environ.update(
         "ADMIN_EMAILS": f"{ADMIN_EMAIL}, otro.admin@example.com",
         "COOKIE_SECURE": "true",
         "MAIL_FROM": "LabDigital <no-responder@example.com>",
+        "BLOB_DIR": tempfile.mkdtemp(prefix="ld-test-blobs-"),
     }
 )
 settings.get_settings.cache_clear()
+
+# Registra TODOS los ORM en `Base.metadata` (FKs entre productos) también en los tests de
+# integración que sólo importan un servicio.
+from backend.entrypoints.web import app as _app  # noqa: E402, F401
 
 # Argon2 barato en tests (la suite hace cientos de hashes).
 users_value_objects._HASHER = argon2.PasswordHasher(time_cost=1, memory_cost=8, parallelism=1)
@@ -89,6 +96,8 @@ def postgres_url() -> Generator[str]:
 
 
 _TABLES = (
+    "submission_reviews, submission_files, submission_members, submissions, blobs, "
+    "team_members, teams, labs, course_memberships, courses, "
     "project_versions, projects, refresh_tokens, sessions, email_tokens, users, "
     "outbox_events, audit_log, rate_limits, backoff_counters, idempotency_keys"
 )
@@ -101,3 +110,9 @@ def db(postgres_url: str) -> Generator[sa.Engine]:
     with sa_engine.begin() as connection:
         connection.execute(sa.text(f"TRUNCATE {_TABLES} RESTART IDENTITY CASCADE"))
     yield sa_engine
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_blob_dir() -> Generator[None]:
+    yield
+    shutil.rmtree(os.environ["BLOB_DIR"], ignore_errors=True)

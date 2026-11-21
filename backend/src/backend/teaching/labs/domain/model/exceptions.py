@@ -42,7 +42,7 @@ class TeamNotFoundError(exceptions.NotFoundError):
 class InvalidTeamCodeError(exceptions.NotFoundError):
     def __init__(self) -> None:
         super().__init__(
-            "No hay ningún equipo con ese código en este laboratorio.", code="not_found"
+            "No hay ningún equipo con ese código en este laboratorio.", code="invalid_code"
         )
 
 
