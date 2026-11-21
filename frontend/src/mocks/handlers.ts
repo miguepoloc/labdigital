@@ -18,6 +18,7 @@ import {
   toMe,
   toSession,
 } from './db'
+import { courseHandlers } from './handlers.courses'
 
 const A = config.apiBase
 
@@ -71,6 +72,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const RATE_LIMITED_EMAIL = 'limite@unimagdalena.edu.co'
 
 export const handlers = [
+  ...courseHandlers,
   http.get(`${A}/health`, () => HttpResponse.json({ ok: true })),
 
   http.post(
