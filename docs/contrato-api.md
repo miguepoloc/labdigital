@@ -111,6 +111,14 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
   cookies nuevas de la misma familia); fuera de esa ventana sí (robo). El frontend además serializa la renovación entre
   pestañas con `navigator.locks.request("ld-refresh", …)` (si no existe, el candado por pestaña).
 - `POST /projects/{id}/versions` acepta cuerpo vacío.
+- **Formas de proyecto** (tras LD-8/9): `ProjectSummary = {id, name, module, current_version_id, current_version_n,
+  revision, created_at, updated_at}`; `Project = ProjectSummary + {content}`; `ProjectVersion = {id, n, kind:
+  autosave|manual|submitted, label|null, size (bytes), created_at, updated_at}`. `POST /projects/{id}/versions` y
+  `POST .../restore` devuelven `Project` (con la `revision` nueva).
+- `GET /submissions/{id}` incluye `content` (proyecto congelado) y `version_id`.
+- **Cookie indicadora** `ld_session=1` (NO HttpOnly, `Secure; SameSite=Lax; Path=/labdigital/`, misma vida que
+  `ld_refresh`): se pone en login/refresh y se borra en logout o al revocar. Sólo evita que páginas públicas pidan
+  `/me` sin sesión; nunca se usa para autorizar.
 
 ## 7. API de integración del módulo FPGA (`window.JGFPGA`, PR a mcangen/JG-FPGA)
 
