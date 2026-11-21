@@ -18,21 +18,30 @@ class UpdateCourseInputDTO(dto.BaseDTO):
     archived: bool | None = None
 
 
+class CourseCountsDTO(dto.BaseDTO):
+    students: int = 0
+    pending: int = 0
+    labs: int = 0
+
+
 class CourseOutputDTO(dto.BaseDTO):
-    """`Course`. `join_code` sólo para el docente/admin (`null` para estudiantes).
-    `my_role`/`my_status`: relación del usuario con el curso (`null` si es admin ajeno)."""
+    """`Course` (contrato §6.1). `join_code` sólo si `my_role=docente`. `my_role`/`my_status`
+    son `null` para un admin sin relación con el curso. `owner_name` y `counts.labs` los
+    completa el orquestador (`teaching.services.courses_orchestrator`)."""
 
     id: str
     name: str
     period: str
     description: str
-    owner_id: str
-    join_code: str | None
     archived_at: str | None
-    created_at: str
-    updated_at: str
+    owner_id: str
+    owner_name: str | None = None
     my_role: str | None
     my_status: str | None
+    join_code: str | None
+    counts: CourseCountsDTO
+    created_at: str
+    updated_at: str
 
     @classmethod
     def from_entity(
@@ -40,20 +49,22 @@ class CourseOutputDTO(dto.BaseDTO):
         course: aggregate.Course,
         membership: aggregate.Membership | None,
         *,
-        can_manage: bool,
+        counts: CourseCountsDTO | None = None,
     ) -> Self:
+        is_teacher = membership is not None and membership.is_teacher
         return cls(
             id=str(course.id),
             name=course.name.value,
             period=course.period.value,
             description=course.description.value,
-            owner_id=str(course.owner_id),
-            join_code=course.join_code.display if can_manage else None,
             archived_at=teaching_dto.iso(course.archived_at),
-            created_at=teaching_dto.iso(course.created_at) or "",
-            updated_at=teaching_dto.iso(course.updated_at) or "",
+            owner_id=str(course.owner_id),
             my_role=membership.role.value if membership else None,
             my_status=membership.status.value if membership else None,
+            join_code=course.join_code.display if is_teacher else None,
+            counts=counts or CourseCountsDTO(),
+            created_at=teaching_dto.iso(course.created_at) or "",
+            updated_at=teaching_dto.iso(course.updated_at) or "",
         )
 
 
@@ -80,8 +91,3 @@ class MembershipOutputDTO(dto.BaseDTO):
             requested_at=teaching_dto.iso(membership.created_at) or "",
             updated_at=teaching_dto.iso(membership.updated_at) or "",
         )
-
-
-class JoinOutputDTO(MembershipOutputDTO):
-    course_name: str
-    course_period: str

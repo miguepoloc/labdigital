@@ -189,6 +189,22 @@ class DefaultMembershipRepository(repositories.Repository[aggregate.Membership])
             stmt = stmt.where(orm.MembershipOrm.role == role.value)
         return [_membership_to_entity(row) for row in self._session.scalars(stmt)]
 
+    def count(
+        self, course_id: teaching_value_objects.CourseId, status: value_objects.MembershipStatus
+    ) -> int:
+        """Estudiantes del curso en `status` (el docente no cuenta)."""
+        return int(
+            self._session.execute(
+                sa.select(sa.func.count())
+                .select_from(orm.MembershipOrm)
+                .where(
+                    orm.MembershipOrm.course_id == course_id.value,
+                    orm.MembershipOrm.status == status.value,
+                    orm.MembershipOrm.role == value_objects.MembershipRole.ESTUDIANTE.value,
+                )
+            ).scalar_one()
+        )
+
     def list_for_user(self, user_id: teaching_value_objects.UserRef) -> list[aggregate.Membership]:
         stmt = sa.select(orm.MembershipOrm).where(orm.MembershipOrm.user_id == user_id.value)
         return [_membership_to_entity(row) for row in self._session.scalars(stmt)]

@@ -40,7 +40,7 @@ def create_course(
         uow.repo(aggregate.Course).add(course)
         uow.repo(aggregate.Membership).add(teacher)
         uow.audit.add(_course_entry(course, value_objects.AuditAction.COURSE_CREATED, actor))
-    return dto.CourseOutputDTO.from_entity(course, teacher, can_manage=True)
+    return dto.CourseOutputDTO.from_entity(course, teacher)
 
 
 def list_my_courses(
@@ -50,12 +50,7 @@ def list_my_courses(
     with uow.transaction():
         memberships = {m.course_id: m for m in _memberships(uow).list_for_user(viewer.user_id)}
         courses = _courses(uow).list_by_ids(list(memberships))
-    return [
-        dto.CourseOutputDTO.from_entity(
-            c, memberships[c.id], can_manage=c.is_teacher(viewer.user_id) or viewer.is_admin
-        )
-        for c in courses
-    ]
+        return [_view(uow, c, memberships[c.id], viewer) for c in courses]
 
 
 def get_course(
@@ -63,9 +58,7 @@ def get_course(
 ) -> dto.CourseOutputDTO:
     with uow.transaction():
         course, membership = _load_visible(uow, viewer, course_id)
-    return dto.CourseOutputDTO.from_entity(
-        course, membership, can_manage=_can_manage(course, viewer)
-    )
+        return _view(uow, course, membership, viewer)
 
 
 def get_access(
@@ -115,7 +108,7 @@ def update_course(
         if input_dto.archived and course.archive():
             uow.audit.add(_course_entry(course, value_objects.AuditAction.COURSE_ARCHIVED, actor))
         uow.repo(aggregate.Course).update(course)
-    return dto.CourseOutputDTO.from_entity(course, membership, can_manage=True)
+        return _view(uow, course, membership, viewer)
 
 
 def rotate_join_code(
@@ -131,7 +124,7 @@ def rotate_join_code(
         course.rotate_join_code()
         uow.repo(aggregate.Course).update(course)
         uow.audit.add(_course_entry(course, value_objects.AuditAction.JOIN_CODE_ROTATED, actor))
-    return dto.CourseOutputDTO.from_entity(course, membership, can_manage=True)
+        return _view(uow, course, membership, viewer)
 
 
 def join(
@@ -140,10 +133,11 @@ def join(
     viewer: teaching_value_objects.Viewer,
     actor: audit.Actor,
     code: str,
-) -> dto.JoinOutputDTO:
-    """Solicitud de inscripción (queda `pending` hasta que el docente apruebe). Idempotente
-    si ya está pendiente o activa; tras un rechazo o retiro vuelve a `pending`. El docente
-    que usa su propio código recibe su membresía de docente."""
+) -> dto.CourseOutputDTO:
+    """Solicitud de inscripción (queda `pending` hasta que el docente apruebe) y devuelve
+    `Course`. Pendiente ⇒ idempotente; rechazada/retirada ⇒ vuelve a `pending`; ya activa o
+    docente ⇒ 409 `already_member`. Código inexistente o curso archivado ⇒ 404
+    `invalid_code`."""
     join_code = value_objects.JoinCode.parse(code)
     if join_code is None:
         raise exceptions.InvalidJoinCodeError()
@@ -159,15 +153,14 @@ def join(
             uow.audit.add(
                 _membership_entry(membership, value_objects.AuditAction.JOIN_REQUESTED, actor)
             )
+        elif membership.is_teacher or membership.is_active_student:
+            raise exceptions.AlreadyMemberError()
         elif membership.rerequest():
             repo.update(membership)
             uow.audit.add(
                 _membership_entry(membership, value_objects.AuditAction.JOIN_REQUESTED, actor)
             )
-    base = dto.MembershipOutputDTO.from_entity(membership)
-    return dto.JoinOutputDTO(
-        **base.model_dump(), course_name=course.name.value, course_period=course.period.value
-    )
+        return _view(uow, course, membership, viewer)
 
 
 def list_members(
@@ -236,6 +229,23 @@ def list_active_student_ids(*, uow: unit_of_work.UnitOfWork, course_id: str) -> 
 
 
 # --------------------------------------------------------------------------------------
+
+
+def _view(
+    uow: unit_of_work.UnitOfWork,
+    course: aggregate.Course,
+    membership: aggregate.Membership | None,
+    viewer: teaching_value_objects.Viewer,
+) -> dto.CourseOutputDTO:
+    """Los conteos de estudiantes/pendientes sólo para quien gestiona el curso."""
+    counts = None
+    if _can_manage(course, viewer):
+        repo = _memberships(uow)
+        counts = dto.CourseCountsDTO(
+            students=repo.count(course.id, value_objects.MembershipStatus.ACTIVE),
+            pending=repo.count(course.id, value_objects.MembershipStatus.PENDING),
+        )
+    return dto.CourseOutputDTO.from_entity(course, membership, counts=counts)
 
 
 def _can_manage(course: aggregate.Course, viewer: teaching_value_objects.Viewer) -> bool:

@@ -9,8 +9,17 @@ class CourseNotFoundError(exceptions.NotFoundError):
 
 
 class InvalidJoinCodeError(exceptions.NotFoundError):
+    """404 `invalid_code` (contrato §6.1)."""
+
     def __init__(self) -> None:
-        super().__init__("No hay ningún curso abierto con ese código.", code="not_found")
+        super().__init__("No hay ningún curso abierto con ese código.", code="invalid_code")
+
+
+class AlreadyMemberError(exceptions.ConflictError):
+    """409 `already_member`: ya es estudiante activo o docente del curso."""
+
+    def __init__(self) -> None:
+        super().__init__("Ya perteneces a este curso.", code="already_member")
 
 
 class MembershipNotFoundError(exceptions.NotFoundError):
@@ -31,3 +40,11 @@ class CourseArchivedError(exceptions.ConflictError):
 class InvalidMembershipTransitionError(exceptions.ConflictError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code="invalid_transition")
+
+
+class NotActiveStudentError(exceptions.ForbiddenError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Sólo los estudiantes con la inscripción aprobada pueden hacer esto.",
+            code="forbidden",
+        )

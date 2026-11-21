@@ -77,3 +77,13 @@ class TeamTooLargeError(exceptions.ValidationError):
             code="validation_error",
             details={"field": "members"},
         )
+
+
+class TeamRequiredError(exceptions.ConflictError):
+    """409 `team_required`: lab en equipo y el estudiante aún no tiene equipo."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Este laboratorio se entrega en equipo: únete a uno o créalo primero.",
+            code="team_required",
+        )
