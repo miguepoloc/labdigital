@@ -81,7 +81,7 @@ def test_versions_persist_with_deferred_fk_and_content(db: sa.Engine) -> None:
     restored = projects.restore_version(
         uow=uow, owner_id=owner, project_id=project.id, version_id=v1.id
     )
-    assert restored.current_version.n == 3
+    assert restored.current_version_n == 3
 
     projects.delete_project(uow=uow, owner_id=owner, project_id=project.id)
     with db.connect() as conn:
@@ -150,7 +150,7 @@ def test_autosave_in_flight_loses_against_a_concurrent_freeze(db: sa.Engine) -> 
             other.execute(sa.text("UPDATE project_versions SET locked = true"))
         loaded.autosave(content=_content("pisado"), base_version=1)
         repo.update(loaded)
-    stored = projects.get_frozen_version(uow=uow, version_id=project.current_version.id)
+    stored = projects.get_frozen_version(uow=uow, version_id=project.current_version_id)
     assert stored.content["files"][0]["text"] == "congelado"  # type: ignore[index]
 
 

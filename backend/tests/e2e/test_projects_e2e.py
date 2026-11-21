@@ -22,8 +22,7 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
     client = env.signup("owner@example.com")
     project = _create(client)
     assert (
-        project["current_version"]["n"] == 1
-        and project["content"]["format"] == "basys3-sim-project"
+        project["current_version_n"] == 1 and project["content"]["format"] == "basys3-sim-project"
     )
     pid = project["id"]
 
@@ -33,7 +32,7 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
         headers=CSRF,
     )
     assert saved.status_code == 200 and saved.json() == {
-        "version_id": project["current_version"]["id"],
+        "version_id": project["current_version_id"],
         "n": 1,
         "revision": 2,
     }
@@ -41,7 +40,19 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
     manual = client.post(
         f"{API}/projects/{pid}/versions", json={"label": "Antes de la entrega"}, headers=CSRF
     )
-    assert manual.status_code == 201 and manual.json()["kind"] == "manual"
+    assert manual.status_code == 201
+    assert set(manual.json()) == {
+        "id",
+        "name",
+        "module",
+        "current_version_id",
+        "current_version_n",
+        "revision",
+        "created_at",
+        "updated_at",
+        "content",
+    }
+    assert manual.json()["revision"] == 3 and manual.json()["current_version_n"] == 1
     after = client.put(
         f"{API}/projects/{pid}/autosave",
         json={"content": unit_projects.content("c"), "base_version": 1},
@@ -64,12 +75,14 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
 
     versions = client.get(f"{API}/projects/{pid}/versions").json()
     assert [v["n"] for v in versions] == [2, 1] and "content" not in versions[0]
+    assert set(versions[0]) == {"id", "n", "kind", "label", "size", "created_at", "updated_at"}
+    assert [v["kind"] for v in versions] == ["autosave", "manual"]
     v1 = client.get(f"{API}/projects/{pid}/versions/{versions[1]['id']}").json()
     assert v1["content"]["files"][0]["text"] == "b"
     restored = client.post(
         f"{API}/projects/{pid}/versions/{versions[1]['id']}/restore", headers=CSRF
     )
-    assert restored.status_code == 200 and restored.json()["current_version"]["n"] == 3
+    assert restored.status_code == 200 and restored.json()["current_version_n"] == 3
 
     assert (
         client.patch(f"{API}/projects/{pid}", json={"name": "Semáforo"}, headers=CSRF).json()[
@@ -79,6 +92,16 @@ def test_project_crud_versions_and_autosave(env: e2e.Env) -> None:
     )
     listed = client.get(f"{API}/projects", params={"module": "fpga"}).json()
     assert [p["id"] for p in listed] == [pid] and "content" not in listed[0]
+    assert set(listed[0]) == {
+        "id",
+        "name",
+        "module",
+        "current_version_id",
+        "current_version_n",
+        "revision",
+        "created_at",
+        "updated_at",
+    }
     assert client.delete(f"{API}/projects/{pid}", headers=CSRF).status_code == 204
     assert client.get(f"{API}/projects/{pid}").status_code == 404
     assert client.get(f"{API}/projects").json() == []
@@ -88,7 +111,7 @@ def test_projects_are_private_to_their_owner(env: e2e.Env) -> None:
     owner = env.signup("o1@example.com")
     intruder = env.signup("o2@example.com")
     project = _create(owner)
-    pid, vid = project["id"], project["current_version"]["id"]
+    pid, vid = project["id"], project["current_version_id"]
     for method, path, body in [
         ("GET", f"/projects/{pid}", None),
         ("PATCH", f"/projects/{pid}", {"name": "mío"}),

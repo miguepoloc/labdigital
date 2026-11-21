@@ -14,7 +14,7 @@ Autoguardado: sobrescribe la versión autosave abierta (la actual) mientras teng
 restaurar), también cuando el autosave sobrescribe la versión abierta: así dos pestañas que
 editan la misma versión abierta se detectan con `base_revision`.
 
-Versiones entregadas (`locked`): `freeze` marca una versión como inmutable para que una
+Versiones entregadas (`kind=submitted`, `locked`): `freeze` marca una versión como inmutable para que una
 entrega la referencie. El autoguardado NUNCA sobrescribe una versión bloqueada (crea una
 nueva aunque esté dentro de la ventana de 10 min); el repositorio sólo actualiza filas con
 `locked = false` y un trigger de Postgres rechaza cualquier cambio de `content` en una fila
@@ -197,8 +197,8 @@ class Project(aggregates.AggregateRoot[value_objects.ProjectId]):
         return self.head
 
     def freeze(self, *, version: ProjectVersion) -> VersionSummary:
-        """Bloquea `version` para una entrega (idempotente). Si es la actual y es autosave, se
-        promueve además a manual. No sube `revision` (el contenido no cambia): el cliente que
+        """Bloquea `version` para una entrega (idempotente): pasa a `kind=submitted` y
+        `locked`. No sube `revision` (el contenido no cambia): el cliente que
         sigue editando no recibe un 409; su siguiente autoguardado crea una versión nueva."""
         self._ensure_not_deleted()
         if version.project_id != self.id:
@@ -206,13 +206,14 @@ class Project(aggregates.AggregateRoot[value_objects.ProjectId]):
         if version.locked:
             return version.summary()
         now = base_value_objects.PosixTime.now()
-        update: dict[str, object] = {"locked": True, "updated_at": now}
-        if version.kind is value_objects.VersionKind.AUTOSAVE:
-            update |= {
-                "kind": value_objects.VersionKind.MANUAL,
+        frozen = version.model_copy(
+            update={
+                "locked": True,
+                "kind": value_objects.VersionKind.SUBMITTED,
                 "label": version.label or "Entregada",
+                "updated_at": now,
             }
-        frozen = version.model_copy(update=update)
+        )
         self._pending_versions.append(frozen)
         if frozen.id == self.head.id:
             self.head = frozen.summary()

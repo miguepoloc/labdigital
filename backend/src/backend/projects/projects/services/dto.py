@@ -22,12 +22,13 @@ class AutosaveInputDTO(dto.BaseDTO):
 
 
 class VersionOutputDTO(dto.BaseDTO):
+    """`ProjectVersion` (contrato §6.1): `kind` autosave|manual|submitted; `size` en bytes."""
+
     id: str
     n: int
     kind: str
     label: str | None
     size: int
-    locked: bool
     created_at: str
     updated_at: str
 
@@ -39,7 +40,6 @@ class VersionOutputDTO(dto.BaseDTO):
             kind=summary.kind.value,
             label=summary.label,
             size=summary.size,
-            locked=summary.locked,
             created_at=_iso(summary.created_at),
             updated_at=_iso(summary.updated_at),
         )
@@ -55,13 +55,14 @@ class VersionDetailOutputDTO(VersionOutputDTO):
 
 
 class ProjectOutputDTO(dto.BaseDTO):
-    """`Project` (listado): sin `content`."""
+    """`ProjectSummary` (contrato §6.1): sin `content`."""
 
     id: str
     name: str
     module: str
+    current_version_id: str
+    current_version_n: int
     revision: int
-    current_version: VersionOutputDTO
     created_at: str
     updated_at: str
 
@@ -71,15 +72,16 @@ class ProjectOutputDTO(dto.BaseDTO):
             id=str(project.id),
             name=project.name.value,
             module=project.module.value,
+            current_version_id=str(project.head.id),
+            current_version_n=project.head.n,
             revision=project.revision,
-            current_version=VersionOutputDTO.from_summary(project.head),
             created_at=_iso(project.created_at),
             updated_at=_iso(project.updated_at),
         )
 
 
 class ProjectDetailOutputDTO(ProjectOutputDTO):
-    """`GET /projects/{id}`: incluye `content` de la versión actual (contrato §4)."""
+    """`Project` = `ProjectSummary` + `content` de la versión actual (contrato §6.1)."""
 
     content: dict[str, Any]
 

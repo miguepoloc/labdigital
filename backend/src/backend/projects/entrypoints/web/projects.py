@@ -101,12 +101,12 @@ def autosave(
 
 @router.post(
     "/{project_id}/versions",
-    response_model=dto.VersionOutputDTO,
+    response_model=dto.ProjectDetailOutputDTO,
     status_code=status.HTTP_201_CREATED,
 )
 def create_version(
     project_id: str, claims: api_auth.ClaimsDep, uow: UowDep, body: ManualVersionBody | None = None
-) -> dto.VersionOutputDTO:
+) -> dto.ProjectDetailOutputDTO:
     return projects.create_manual_version(
         uow=uow,
         owner_id=claims.user_id,

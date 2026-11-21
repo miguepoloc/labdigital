@@ -43,6 +43,8 @@ _FORMAT_FOR_MODULE = {Module.FPGA: "basys3-sim-project"}
 class VersionKind(enum.StrEnum):
     AUTOSAVE = enum.auto()
     MANUAL = enum.auto()
+    # Congelada por una entrega (contrato §6.1): inmutable (`locked`).
+    SUBMITTED = enum.auto()
 
 
 class ProjectName(value_objects.ValueObject):

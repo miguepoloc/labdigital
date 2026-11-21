@@ -94,18 +94,21 @@ def test_manual_version_promotes_autosave_then_copies_and_restore() -> None:
     promoted = projects.create_manual_version(
         uow=uow, owner_id=OWNER, project_id=project.id, label="Entrega"
     )  # type: ignore[arg-type]
-    assert (promoted.n, promoted.kind, promoted.label) == (1, "manual", "Entrega")
+    # Devuelve `Project` (contrato §6.1) con la revision nueva.
+    assert (promoted.current_version_n, promoted.revision) == (1, 2)
+    assert promoted.content["format"] == "basys3-sim-project"
     copy = projects.create_manual_version(
         uow=uow, owner_id=OWNER, project_id=project.id, label=None
     )  # type: ignore[arg-type]
-    assert copy.n == 2
+    assert (copy.current_version_n, copy.revision) == (2, 3)
     restored = projects.restore_version(
-        uow=uow, owner_id=OWNER, project_id=project.id, version_id=promoted.id
+        uow=uow, owner_id=OWNER, project_id=project.id, version_id=promoted.current_version_id
     )  # type: ignore[arg-type]
-    assert restored.current_version.n == 3 and "versión 1" in (restored.current_version.label or "")
-    assert [
-        v.n for v in projects.list_versions(uow=uow, owner_id=OWNER, project_id=project.id)
-    ] == [3, 2, 1]  # type: ignore[arg-type]
+    assert (restored.current_version_n, restored.revision) == (3, 4)
+    versions = projects.list_versions(uow=uow, owner_id=OWNER, project_id=project.id)  # type: ignore[arg-type]
+    assert [v.n for v in versions] == [3, 2, 1]
+    assert [v.kind for v in versions] == ["manual", "manual", "manual"]
+    assert versions[2].label == "Entrega" and "versión 1" in (versions[0].label or "")
     assert len(repo.versions) == 3
 
 
@@ -175,7 +178,7 @@ def test_revision_rises_on_every_save_and_stale_revision_conflicts() -> None:
         uow=uow, owner_id=OWNER, project_id=project.id, label=None
     )  # type: ignore[arg-type]
     detail = projects.get_project(uow=uow, owner_id=OWNER, project_id=project.id)  # type: ignore[arg-type]
-    assert manual.n == 1 and detail.revision == 4
+    assert manual.current_version_n == 1 and manual.revision == detail.revision == 4
 
 
 def test_frozen_version_is_never_overwritten_by_autosave() -> None:
@@ -192,6 +195,11 @@ def test_frozen_version_is_never_overwritten_by_autosave() -> None:
     assert again == frozen  # idempotente
     after = _autosave(uow, project.id, 1, "sigo editando")  # dentro de la ventana de 10 min
     assert after.n == 2
+    kinds = {
+        v.n: v.kind
+        for v in projects.list_versions(uow=uow, owner_id=OWNER, project_id=project.id)  # type: ignore[arg-type]
+    }
+    assert kinds == {1: "submitted", 2: "autosave"}
     _autosave(uow, project.id, 2, "y más")
     content_of_frozen = projects.get_frozen_version(uow=uow, version_id=frozen.version_id)  # type: ignore[arg-type]
     assert content_of_frozen.content["files"][0]["text"] == "entregado"  # type: ignore[index]

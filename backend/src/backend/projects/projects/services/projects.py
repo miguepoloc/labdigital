@@ -89,17 +89,18 @@ def autosave(
 
 def create_manual_version(
     *, uow: unit_of_work.UnitOfWork, owner_id: str, project_id: str, label: str | None
-) -> dto.VersionOutputDTO:
+) -> dto.ProjectDetailOutputDTO:
+    """Devuelve `Project` con la `revision` nueva (contrato §6.1)."""
     with uow.transaction():
         repo = _repo(uow)
         project = _get_accessible(repo, owner_id, project_id)
         head_version = repo.get_version(project.id, project.head.id)
-        summary = project.save_manual(
+        project.save_manual(
             label=value_objects.VersionLabel(value=label) if label else None,
             head_version=head_version,
         )
         repo.update(project)
-    return dto.VersionOutputDTO.from_summary(summary)
+    return dto.ProjectDetailOutputDTO.from_entity_and_content(project, head_version.content.data)
 
 
 def list_versions(
