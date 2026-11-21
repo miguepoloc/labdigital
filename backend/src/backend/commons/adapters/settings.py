@@ -60,6 +60,9 @@ class Settings(pydantic_settings.BaseSettings):
     # registra junto a la fecha de aceptación en el registro.
     data_policy_version: str = "2026-11"
 
+    # Archivos subidos (contenido direccionado por SHA-256; volumen `labdigital-blobs`).
+    blob_dir: str = "/data/blobs"
+
     # Worker
     worker_poll_seconds: float = 5.0
 
