@@ -1,0 +1,14 @@
+{
+  "expectations": [
+    {"text": "root_cause_identified", "passed": true, "evidence": "'el evento queda en memoria, colgado del objeto Python. Nada lo saca de ahí automáticamente' — same core diagnosis as the with-skill run, using generic Cosmic-Python terminology (collect_new_events/repo.seen) instead of this standard's exact API names (pull_events/uow.outbox.record)"},
+    {"text": "outbox_pattern_explained", "passed": true, "evidence": "Dedicated 'El fix según el estándar (outbox transaccional)' section, explicit dual-write reasoning for why direct publish is unsafe"},
+    {"text": "same_transaction_emphasized", "passed": true, "evidence": "'escribís el evento en una tabla outbox DENTRO de la misma transacción de PostgreSQL que persiste el agregado'"},
+    {"text": "shows_corrected_code", "passed": true, "evidence": "Shows OutboxRecord model + persist_events_to_outbox + a worker/cron publisher"},
+    {"text": "mentions_relay_process", "passed": true, "evidence": "'Un proceso aparte (poller o CDC) lee la tabla y publica a SQS con reintentos'"}
+  ],
+  "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0},
+  "timing": {"executor_duration_seconds": 81.9, "total_tokens": 48939},
+  "eval_feedback": {
+    "overall": "This run passes all 5 assertions with essentially the same quality as the with-skill run — the transactional outbox pattern is well-known enough that a strong baseline model reaches it unprompted. This eval, as currently written, mainly tests general DDD/event-driven knowledge rather than this specific standard's conventions, so it under-discriminates between the two conditions. What the baseline genuinely cannot produce (and doesn't) is this codebase's exact vocabulary and mechanism: pull_events()/uow.outbox.record() by name, the DomainEvent-vs-IntegrationEvent relay-eligibility distinction, or a diagnostic checklist ordered around this standard's actual pipeline (outbox_events table -> published_at -> SNS filter policy -> DLQ). See with_skill/grading.json's eval_feedback for a concrete suggestion to sharpen this eval."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "expectations": [
+    {"text": "naming_correct", "passed": true, "evidence": "commerce/gift_card/ — explicitly reasoned per §3.1: 'El subcontexto se nombra en snake_case coincidiendo con el agregado'"},
+    {"text": "module_qualified_imports", "passed": true, "evidence": "Every file uses `from x import y` then `y.Z` (e.g. `from commons.domain import aggregates, money` then `aggregates.AggregateRoot`); aliases used correctly for collisions (`base_value_objects`, `commons_exceptions`)"},
+    {"text": "typed_id_used", "passed": true, "evidence": "`class GiftCardId(value_objects.UuidV7Id): pass`"},
+    {"text": "money_used_for_balance", "passed": true, "evidence": "`balance: money.NonNegativeMoney`, redemption amount typed `money.PositiveMoney`; even added a missing `__sub__` to the shared `Money` class rather than hand-rolling subtraction"},
+    {"text": "posixtime_for_timestamps", "passed": true, "evidence": "`expires_at: base_value_objects.PosixTime`, uses `PosixTime.now()`/`.from_datetime()`, never raw datetime in the domain; ORM stores `expires_at: Mapped[int]` as BigInteger microseconds"},
+    {"text": "strenum_for_status", "passed": true, "evidence": "`class GiftCardStatus(enum.StrEnum):`"},
+    {"text": "event_recorded_correctly", "passed": true, "evidence": "`GiftCardRedeemed(domain_events.DomainEvent)` defined; `self.record_event(events.GiftCardRedeemed(...))` called inside `redeem()`"},
+    {"text": "events_drained_in_service", "passed": true, "evidence": "`_publish_events(uow, gift_card)` called inside `with uow.transaction():` in both `issue_gift_card` and `redeem_gift_card`"},
+    {"text": "no_unnecessary_orchestrator", "passed": true, "evidence": "Explicitly walked the decision tree ('¿el caso de uso muta exactamente una instancia de agregado? → Sí... §10.1') and named the Middle Man smell as the reason not to add one"},
+    {"text": "narrow_domain_exception", "passed": true, "evidence": "`GiftCardNotActiveError`, `GiftCardExpiredError`, `InsufficientGiftCardBalanceError`, `GiftCardNotFoundError` — one per invalid transition, all subclassing `commons.domain.exceptions`"}
+  ],
+  "summary": {"passed": 10, "failed": 0, "total": 10, "pass_rate": 1.0},
+  "timing": {"executor_duration_seconds": 449.2, "total_tokens": 116366},
+  "eval_feedback": {
+    "suggestions": [
+      {"reason": "The run surfaced a real gap in the skill's own Money reference (missing __sub__) and fixed it in-place rather than hand-rolling subtraction elsewhere — worth backporting __sub__ into the actual references/domain-and-application.md and ARCHITECTURE.md so future runs don't have to rediscover this."}
+    ],
+    "overall": "All 10 assertions pass with genuine, well-reasoned evidence (not superficial) — the decision-tree walk-through for 'no orchestrator' and the correction of an incomplete Money reference show real understanding, not pattern-matching against the golden path example."
+  }
+}

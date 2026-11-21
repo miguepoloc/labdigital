@@ -1,0 +1,17 @@
+{
+  "expectations": [
+    {"text": "orchestrator_calls_services_not_repo", "passed": false, "evidence": "There is no separate service-layer function per subcontext — the single `cancel_order` use-case function calls `uow.orders.get(order_id)` and `uow.stock.get_by_sku(line.sku)` (repositories) directly, then `order.cancel(...)`/`stock.release_reservation(...)` (aggregate methods) directly"},
+    {"text": "correct_orchestration_tier", "passed": false, "evidence": "No orchestrator/service-layer split exists at all; one flat application-service function does everything for both aggregates"},
+    {"text": "atomicity_via_nested_transactions", "passed": false, "evidence": "Atomicity comes from one flat `async with uow: ... await uow.commit()` around the whole function, not from composing separate per-subcontext service functions that nest their own transactions"},
+    {"text": "new_release_stock_function", "passed": false, "evidence": "No stock-side service function exists; `stock.release_reservation(line.reservation_id)` — a domain method — is called directly inline from the flat use case"},
+    {"text": "orchestrator_no_domain_import", "passed": false, "evidence": "The use-case function imports and directly manipulates both aggregates (`order.cancel(...)`, `stock.release_reservation(...)`) — the exact 'reach past the service into the aggregate' shape this standard's rule exists to prevent"}
+  ],
+  "summary": {"passed": 0, "failed": 5, "total": 5, "pass_rate": 0.0},
+  "timing": {"executor_duration_seconds": 159.3, "total_tokens": 58864},
+  "claims": [
+    {"claim": "Uses async SQLAlchemy (AsyncSession, async def) throughout", "type": "factual", "verified": true, "evidence": "shared/sqlalchemy_uow.py, stock/adapters/repository.py, orders/adapters/repository.py all use sqlalchemy.ext.asyncio"}
+  ],
+  "eval_feedback": {
+    "overall": "A well-engineered, genuinely thoughtful answer — the Stock.release_reservation-by-reservation_id design (avoiding a bare counter decrement) is arguably a better domain model than a naive quantity subtraction, and the idempotency-by-design + cross-service outbox discussion in section 8 is production-grade thinking. But it collapses the orchestrator/service distinction into one flat use-case function that reaches directly into both repositories and both aggregates — precisely the shape the standard's layering rule exists to prevent, and it independently defaults to async SQLAlchemy, the opposite of this standard's deliberate sync-only decision for Lambda. This is the clean discriminating result the eval is designed to surface: competent generic DDD vs. this specific codebase's house rules."
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "skill_name": "ddd-hexagonal-fastapi-standard",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Necesito crear un nuevo subcontexto en commerce para tarjetas de regalo: GiftCard con code, balance (dinero), status (activa/canjeada/expirada). Debe emitir un evento cuando se canjea. Muéstrame el código completo: domain, adapters, services, siguiendo el estándar.",
+      "expected_output": "Código completo de un nuevo subcontexto commerce/gift_cards/ (o nombre snake_case equivalente al agregado GiftCard) siguiendo el estándar: GiftCardId tipado (UuidV7Id), balance con Money/PositiveMoney o NonNegativeMoney, status con enum.StrEnum, PosixTime para timestamps (nunca datetime), imports por módulo (no from x import Clase), evento de dominio (GiftCardRedeemed) grabado con record_event() en el método de canje, un application service que abre uow.transaction(), llama al agregado, hace uow.repo(...).put(...) y drena los eventos al outbox, y NO agrega un orchestrator innecesario (es un solo agregado).",
+      "assertions": [
+        {"name": "naming_correct", "description": "El subcontexto se nombra en snake_case coincidiendo con el agregado (gift_cards/ o similar), no una categoría genérica", "type": "manual"},
+        {"name": "module_qualified_imports", "description": "Imports son de módulos, no de clases/funciones directas (from x import y, luego y.Clase)", "type": "manual"},
+        {"name": "typed_id_used", "description": "GiftCardId es un tipo propio que envuelve UuidV7Id, no un UUID/str crudo", "type": "manual"},
+        {"name": "money_used_for_balance", "description": "balance usa Money/PositiveMoney/NonNegativeMoney, no float/Decimal crudo", "type": "manual"},
+        {"name": "posixtime_for_timestamps", "description": "created_at/updated_at usan PosixTime, nunca datetime nativo", "type": "manual"},
+        {"name": "strenum_for_status", "description": "status usa enum.StrEnum, no class X(str, enum.Enum)", "type": "manual"},
+        {"name": "event_recorded_correctly", "description": "Existe una clase de evento (ej. GiftCardRedeemed) y se registra vía record_event() dentro del método de canje del agregado", "type": "manual"},
+        {"name": "events_drained_in_service", "description": "El application service llama pull_events() y escribe al outbox DENTRO de la misma transacción que la mutación", "type": "manual"},
+        {"name": "no_unnecessary_orchestrator", "description": "No introduce un orchestrator para este caso de un solo agregado", "type": "manual"},
+        {"name": "narrow_domain_exception", "description": "Usa una excepción de dominio específica y nombrada (no una genérica) para transiciones inválidas", "type": "manual"}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Cuando se cancela una orden quiero liberar el stock reservado, atómicamente. ¿Cómo lo implemento siguiendo el estándar? Dame el código.",
+      "expected_output": "Un orchestrator a nivel de producto (commerce/services/cancel_order_orchestrator.py o similar) que llama a funciones de servicio de orders (cancel_order) y stock (release_stock) — nunca a uow.repo(...) ni a métodos del agregado directamente — compuestas dentro de una transacción atómica vía transacciones anidadas del UoW. Debe reconocer que es un caso de mismo producto/múltiples agregados (orchestrator de producto, no cross-producto ni caso de un solo agregado).",
+      "assertions": [
+        {"name": "orchestrator_calls_services_not_repo", "description": "El orchestrator llama a funciones de services/ (orders.cancel_order, stock.release_stock), nunca a uow.repo(...) ni a métodos del agregado directamente", "type": "manual"},
+        {"name": "correct_orchestration_tier", "description": "Identifica correctamente que es un caso de orchestrator a nivel de producto (mismo producto, múltiples agregados), no cross-producto ni de un solo agregado", "type": "manual"},
+        {"name": "atomicity_via_nested_transactions", "description": "La atomicidad se logra abriendo uow.transaction() en el orchestrator y dejando que las llamadas a los servicios (que abren su propia transacción) se unan a la externa — no con una transacción manual distinta", "type": "manual"},
+        {"name": "new_release_stock_function", "description": "Crea/usa una función de servicio release_stock (o equivalente) en stock, distinta de reserve_stock, no reutiliza reserve_stock incorrectamente", "type": "manual"},
+        {"name": "orchestrator_no_domain_import", "description": "El orchestrator no importa domain/ ni adapters/ de orders o stock directamente", "type": "manual"}
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Tengo un evento que se registra con record_event() en un agregado pero nunca veo que llegue a SQS. ¿Por qué está pasando esto y cómo lo arreglo según el estándar?",
+      "expected_output": "Diagnóstico correcto: record_event() solo agrega el evento a una lista en memoria del agregado; si el application service nunca llama pull_events() y escribe el resultado al outbox dentro de la misma transacción, el evento se pierde en silencio al terminar el request (exactamente el bug real documentado de sona-sso-backend). La solución muestra el código correcto: pull_events() + uow.outbox.record(event) por cada evento, dentro del mismo with uow.transaction(): que la mutación, y menciona que un relay separado (cron) es quien realmente publica las filas del outbox a SNS/SQS.",
+      "assertions": [
+        {"name": "root_cause_identified", "description": "Identifica que record_event() solo llena una lista en memoria y que falta pull_events() + escritura al outbox en el service", "type": "manual"},
+        {"name": "outbox_pattern_explained", "description": "Explica el patrón Outbox transaccional como la solución, no sugiere publicar directo a SQS desde el agregado o el servicio", "type": "manual"},
+        {"name": "same_transaction_emphasized", "description": "Enfatiza que el drenado de eventos al outbox debe ocurrir DENTRO de la misma transacción que la mutación del agregado, no después del commit", "type": "manual"},
+        {"name": "shows_corrected_code", "description": "Muestra el código corregido del service function con pull_events()/outbox.record() dentro del uow.transaction()", "type": "manual"},
+        {"name": "mentions_relay_process", "description": "Menciona que un proceso relay/cron separado es el que efectivamente publica las filas del outbox a SNS/SQS, no que el evento llega solo con grabarlo", "type": "manual"}
+      ]
+    }
+  ]
+}

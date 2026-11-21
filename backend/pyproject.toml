@@ -1,0 +1,49 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Golden-path reference implementation of the DDD + Hexagonal architecture standard (FastAPI + PostgreSQL + AWS Lambda)."
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "mangum>=0.19",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "pyjwt[crypto]>=2.9",
+    "uuid7>=0.1",
+    "httpx>=0.27",
+    "boto3>=1.35",
+    "backoff>=2.2",
+    "email-validator>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "testcontainers[postgres]>=4.8",
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "import-linter>=2.1",
+    "boto3-stubs[sns]>=1.35",
+    "pre-commit>=4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/backend"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+python_files = "test_*.py"
+markers = [
+    "unit: fast, no I/O, fakes only",
+    "integration: real Postgres via testcontainers",
+    "e2e: full FastAPI TestClient round trip",
+]

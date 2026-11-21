@@ -1,0 +1,17 @@
+{
+  "eval_id": 1,
+  "eval_name": "gift-card-context",
+  "prompt": "Necesito crear un nuevo subcontexto en commerce para tarjetas de regalo: GiftCard con code, balance (dinero), status (activa/canjeada/expirada). Debe emitir un evento cuando se canjea. Muéstrame el código completo: domain, adapters, services, siguiendo el estándar.",
+  "assertions": [
+    {"name": "naming_correct", "description": "El subcontexto se nombra en snake_case coincidiendo con el agregado (gift_cards/ o similar), no una categoría genérica", "type": "manual"},
+    {"name": "module_qualified_imports", "description": "Imports son de módulos, no de clases/funciones directas (from x import y, luego y.Clase)", "type": "manual"},
+    {"name": "typed_id_used", "description": "GiftCardId es un tipo propio que envuelve UuidV7Id, no un UUID/str crudo", "type": "manual"},
+    {"name": "money_used_for_balance", "description": "balance usa Money/PositiveMoney/NonNegativeMoney, no float/Decimal crudo", "type": "manual"},
+    {"name": "posixtime_for_timestamps", "description": "created_at/updated_at usan PosixTime, nunca datetime nativo", "type": "manual"},
+    {"name": "strenum_for_status", "description": "status usa enum.StrEnum, no class X(str, enum.Enum)", "type": "manual"},
+    {"name": "event_recorded_correctly", "description": "Existe una clase de evento (ej. GiftCardRedeemed) y se registra vía record_event() dentro del método de canje del agregado", "type": "manual"},
+    {"name": "events_drained_in_service", "description": "El application service llama pull_events() y escribe al outbox DENTRO de la misma transacción que la mutación", "type": "manual"},
+    {"name": "no_unnecessary_orchestrator", "description": "No introduce un orchestrator para este caso de un solo agregado", "type": "manual"},
+    {"name": "narrow_domain_exception", "description": "Usa una excepción de dominio específica y nombrada (no una genérica) para transiciones inválidas", "type": "manual"}
+  ]
+}

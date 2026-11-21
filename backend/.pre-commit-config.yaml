@@ -1,0 +1,72 @@
+# Same checks CI runs (`.github/workflows/ci.yml`) and `make check` runs locally — the point
+# of pre-commit is that a PR is never rejected by CI for something that could have been
+# caught on the author's own machine first, and that format/lint/type/import rules land the
+# same way regardless of who's typing. See CONTRIBUTING.md for the full workflow.
+#
+# `make hooks` runs `pre-commit install --hook-type pre-commit --hook-type commit-msg` —
+# install-time only registers `pre-commit` by default, the `commit-msg` stage (branch/commit
+# message format below) needs its own hook type registered explicitly.
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-toml
+      - id: check-yaml
+      - id: no-commit-to-branch
+        args: ["--branch", "main", "--branch", "master"]
+
+  - repo: local
+    hooks:
+      # --- Naming conventions (CONTRIBUTING.md) ---
+      - id: branch-name
+        name: Nombre de rama (nombre.apellido/tipo/TICKET-123-descripcion)
+        entry: python3 scripts/check_branch_name.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      - id: commit-message
+        name: "Mensaje de commit (tipo: #ticket descripción)"
+        entry: python3 scripts/check_commit_message.py
+        language: system
+        pass_filenames: true
+        stages: [commit-msg]
+
+      # --- Same format/validations as `make check`, run on staged files only ---
+      - id: ruff-format
+        name: ruff format --check
+        entry: uv run ruff format --check
+        language: system
+        types: [python]
+
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check
+        language: system
+        types: [python]
+
+      # mypy/import-linter need the whole graph, not just the staged files — pass_filenames
+      # false, but still gated on `types: [python]` so a docs-only commit skips both.
+      - id: mypy
+        name: mypy src
+        entry: uv run mypy src
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      - id: import-linter
+        name: lint-imports (import-linter contracts)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        types: [python]

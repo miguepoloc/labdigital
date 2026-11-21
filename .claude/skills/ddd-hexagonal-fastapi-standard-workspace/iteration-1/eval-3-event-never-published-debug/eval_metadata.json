@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "eval_name": "event-never-published-debug",
+  "prompt": "Tengo un evento que se registra con record_event() en un agregado pero nunca veo que llegue a SQS. ¿Por qué está pasando esto y cómo lo arreglo según el estándar?",
+  "assertions": [
+    {"name": "root_cause_identified", "description": "Identifica que record_event() solo llena una lista en memoria y que falta pull_events() + escritura al outbox en el service", "type": "manual"},
+    {"name": "outbox_pattern_explained", "description": "Explica el patrón Outbox transaccional como la solución, no sugiere publicar directo a SQS desde el agregado o el servicio", "type": "manual"},
+    {"name": "same_transaction_emphasized", "description": "Enfatiza que el drenado de eventos al outbox debe ocurrir DENTRO de la misma transacción que la mutación del agregado", "type": "manual"},
+    {"name": "shows_corrected_code", "description": "Muestra el código corregido del service function con pull_events()/outbox.record() dentro del uow.transaction()", "type": "manual"},
+    {"name": "mentions_relay_process", "description": "Menciona que un proceso relay/cron separado publica las filas del outbox a SNS/SQS", "type": "manual"}
+  ]
+}

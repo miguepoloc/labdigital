@@ -1,0 +1,158 @@
+; Import-linter contracts — ARCHITECTURE.md §16. Run: lint-imports
+; Every new subcontext gets all 6 contracts, not a subset (that gap in sona-sso-backend
+; is exactly the anti-pattern §16/§20 warns against).
+
+[importlinter]
+root_package = backend
+include_external_packages = True
+
+; ---------------------------------------------------------------------------
+; Contract 1 — Domain purity: nothing under domain/ may import an infra SDK.
+; ---------------------------------------------------------------------------
+[importlinter:contract:domain-purity]
+name = Domain purity
+type = forbidden
+source_modules =
+    backend.identity.users.domain
+    backend.commerce.orders.domain
+    backend.commerce.stock.domain
+forbidden_modules =
+    fastapi
+    sqlalchemy
+    boto3
+    httpx
+    mangum
+
+; ---------------------------------------------------------------------------
+; Contract 2 — Layering within each subcontext: adapters -> domain, never the reverse;
+; services -> adapters + domain.
+; ---------------------------------------------------------------------------
+[importlinter:contract:users-layering]
+name = identity.users layering
+type = layers
+layers =
+    backend.identity.users.services
+    backend.identity.users.adapters
+    backend.identity.users.domain
+
+[importlinter:contract:orders-layering]
+name = commerce.orders layering
+type = layers
+layers =
+    backend.commerce.orders.services
+    backend.commerce.orders.adapters
+    backend.commerce.orders.domain
+
+[importlinter:contract:stock-layering]
+name = commerce.stock layering
+type = layers
+layers =
+    backend.commerce.stock.services
+    backend.commerce.stock.adapters
+    backend.commerce.stock.domain
+
+; ---------------------------------------------------------------------------
+; Contract 3 — Context independence: subcontexts never import each other's domain/services
+; directly. orders <-> stock only via product-local commerce.commons or the orchestrator.
+; ---------------------------------------------------------------------------
+; Each listed module is one "sibling" for independence purposes, INCLUDING everything
+; inside it — list the two subcontexts themselves, not their internal domain/services
+; sub-modules separately, or orders.services legitimately importing orders.domain (its own
+; domain — required, not a violation) gets flagged as if it were a cross-context import.
+; Found by actually running `lint-imports` against this template, not assumed.
+[importlinter:contract:orders-stock-independence]
+name = orders/stock context independence
+type = independence
+modules =
+    backend.commerce.orders
+    backend.commerce.stock
+
+; ---------------------------------------------------------------------------
+; Contract 4 — Commons independence: global and product-local commons import no product.
+; ---------------------------------------------------------------------------
+[importlinter:contract:commons-independence]
+name = commons independence
+type = forbidden
+source_modules =
+    backend.commons
+    backend.commerce.commons
+forbidden_modules =
+    backend.identity
+    backend.commerce.orders
+    backend.commerce.stock
+
+; ---------------------------------------------------------------------------
+; Contract 5 — Entrypoint thinness: entrypoints import services/commons, never domain.
+; ---------------------------------------------------------------------------
+; Own product's domain stays fully forbidden. A DIFFERENT product's domain.model.events is
+; allowed through deliberately: an IntegrationEvent is the public contract a consumer is
+; meant to import (that's the whole point of promoting a DomainEvent to one, ARCHITECTURE.md
+; §11.1) — commerce/entrypoints/events/on_user_deactivated.py imports
+; identity.users.domain.model.events.UserDeactivated for exactly this reason. What stays
+; forbidden either way is aggregate/adapters — the actual business logic and persistence.
+[importlinter:contract:entrypoints-thinness]
+name = entrypoint thinness
+type = forbidden
+; DIRECT imports only — an entrypoint legitimately, transitively depends on domain/adapters
+; *through* services (that's the whole point of the layer). What this contract actually
+; polices is entrypoints reaching PAST that gatekeeper, not having any relationship to it
+; at all — import-linter's default (transitive) checking can't tell those two apart, so it
+; has to be told explicitly. Found by actually running `lint-imports` against this
+; template, not assumed.
+;
+; `orders.adapters.pricing_adapter`/`.user_profile_adapter` are NOT listed below, even
+; though they're concrete adapters: an entrypoint is the composition root that constructs a
+; port implementation and threads it into a services/orchestrator call as a required kwarg
+; (ARCHITECTURE.md §10.2a/§10.2b) — verified against bold's own
+; `entrypoints/web/breb/breb_credibanco.py`, which imports
+; `bold.deposit.breb.breb_cashin.adapters.breb_cashin_pricing_adapter` for exactly this and
+; never touches `uow.default_repo(...)`/`find_by_id` directly. `orders.adapters.repository`
+; (and `.orm`) stay forbidden — persistence is the one thing an entrypoint may never reach
+; past the service layer for.
+allow_indirect_imports = true
+source_modules =
+    backend.identity.entrypoints
+    backend.commerce.entrypoints
+forbidden_modules =
+    backend.identity.users.domain.model.aggregate
+    backend.identity.users.adapters
+    backend.commerce.orders.domain.model.aggregate
+    backend.commerce.orders.adapters.repository
+    backend.commerce.orders.adapters.orm
+    backend.commerce.stock.domain.model.aggregate
+    backend.commerce.stock.adapters
+
+; ---------------------------------------------------------------------------
+; Contract 6 — Orchestrator thinness: orchestrators import services + value_objects only,
+; never aggregate/events/rules/adapters. See ARCHITECTURE.md §16 for the value_objects
+; exception (typing-only) and why it's carved out explicitly.
+;
+; `domain.model.exceptions` is deliberately left off the forbidden list below too, same
+; reasoning as value_objects: an orchestrator catching a specific, named exception a service
+; call it just made can raise (e.g. `stock.reserve_stock` -> `InsufficientStockError`) isn't
+; reaching past that service into its internals — it's reacting to the documented shape of
+; that one call's failure, the same pattern bold's own orchestrators use (e.g.
+; `register_instant_issue_debit_card_orchestrator.py` catching
+; `InstantIssueDebitCardBlockedOnIssuerToBeAssignedError`/`ClientNotEnabledError` by name,
+; never a bare `except Exception:`).
+; ---------------------------------------------------------------------------
+[importlinter:contract:orchestrator-thinness]
+name = orchestrator thinness
+type = forbidden
+; Direct imports only — same reasoning as entrypoint-thinness above: an orchestrator
+; legitimately, transitively depends on domain/adapters *through* the services it calls.
+allow_indirect_imports = true
+source_modules =
+    backend.commerce.services
+    backend.orchestrators
+forbidden_modules =
+    backend.commerce.orders.domain.model.aggregate
+    backend.commerce.orders.domain.model.events
+    backend.commerce.orders.domain.model.rules
+    backend.commerce.orders.adapters
+    backend.commerce.stock.domain.model.aggregate
+    backend.commerce.stock.domain.model.events
+    backend.commerce.stock.adapters
+    backend.identity.users.domain.model.aggregate
+    backend.identity.users.domain.model.events
+    backend.identity.users.adapters

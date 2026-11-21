@@ -1,0 +1,107 @@
+# Mirrors `make check` (see CONTRIBUTING.md) — the same 4 checks a contributor's own
+# pre-commit hooks already ran locally, run again here so nothing merges on the strength of
+# `git commit --no-verify` alone. A separate `pre-commit-drift-guard` job re-runs the actual
+# `.pre-commit-config.yaml` hooks (not just the same commands hand-copied into this file) so
+# the two never quietly drift apart.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint + types + imports + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: ruff format --check
+        run: uv run ruff format --check .
+
+      - name: ruff check
+        run: uv run ruff check .
+
+      - name: mypy
+        run: uv run mypy src
+
+      - name: import-linter
+        run: uv run lint-imports
+
+      - name: pytest -m unit
+        run: uv run pytest -m unit
+
+  pre-commit-drift-guard:
+    name: pre-commit hooks (catches config drift from the job above)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      # branch-name/commit-message read git state (current branch, a commit-msg file) that
+      # doesn't mean the same thing against a PR's merge-ref checkout — CONTRIBUTING.md's
+      # convention is still enforced locally by the commit-msg/pre-commit git hooks
+      # themselves, this job only re-validates the format/lint/type/import hooks.
+      - name: pre-commit run --all-files
+        run: uv run pre-commit run --all-files
+        env:
+          SKIP: branch-name,commit-message
+
+  integration:
+    name: integration tests (real Postgres via testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      # ubuntu-latest ships Docker already running — testcontainers needs nothing extra.
+      - name: pytest -m integration
+        run: |
+          set +e
+          uv run pytest -m integration
+          status=$?
+          set -e
+          if [ "$status" -eq 5 ]; then
+            echo "No integration tests collected yet — not failing the build for that alone."
+            exit 0
+          fi
+          exit "$status"

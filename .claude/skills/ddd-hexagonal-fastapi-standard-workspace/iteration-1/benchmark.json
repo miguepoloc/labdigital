@@ -1,0 +1,379 @@
+{
+  "metadata": {
+    "skill_name": "ddd-hexagonal-fastapi-standard",
+    "skill_path": "/Users/miguepoloc/Code/01-active-projects/backend-architecture-standard/.claude/skills/ddd-hexagonal-fastapi-standard",
+    "executor_model": "claude-sonnet-5",
+    "analyzer_model": "claude-sonnet-5",
+    "timestamp": "2026-09-03T04:52:25Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 10,
+        "failed": 0,
+        "total": 10,
+        "time_seconds": 449.2,
+        "tokens": 116366,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "naming_correct",
+          "passed": true,
+          "evidence": "commerce/gift_card/ \u2014 explicitly reasoned per \u00a73.1: 'El subcontexto se nombra en snake_case coincidiendo con el agregado'"
+        },
+        {
+          "text": "module_qualified_imports",
+          "passed": true,
+          "evidence": "Every file uses `from x import y` then `y.Z` (e.g. `from commons.domain import aggregates, money` then `aggregates.AggregateRoot`); aliases used correctly for collisions (`base_value_objects`, `commons_exceptions`)"
+        },
+        {
+          "text": "typed_id_used",
+          "passed": true,
+          "evidence": "`class GiftCardId(value_objects.UuidV7Id): pass`"
+        },
+        {
+          "text": "money_used_for_balance",
+          "passed": true,
+          "evidence": "`balance: money.NonNegativeMoney`, redemption amount typed `money.PositiveMoney`; even added a missing `__sub__` to the shared `Money` class rather than hand-rolling subtraction"
+        },
+        {
+          "text": "posixtime_for_timestamps",
+          "passed": true,
+          "evidence": "`expires_at: base_value_objects.PosixTime`, uses `PosixTime.now()`/`.from_datetime()`, never raw datetime in the domain; ORM stores `expires_at: Mapped[int]` as BigInteger microseconds"
+        },
+        {
+          "text": "strenum_for_status",
+          "passed": true,
+          "evidence": "`class GiftCardStatus(enum.StrEnum):`"
+        },
+        {
+          "text": "event_recorded_correctly",
+          "passed": true,
+          "evidence": "`GiftCardRedeemed(domain_events.DomainEvent)` defined; `self.record_event(events.GiftCardRedeemed(...))` called inside `redeem()`"
+        },
+        {
+          "text": "events_drained_in_service",
+          "passed": true,
+          "evidence": "`_publish_events(uow, gift_card)` called inside `with uow.transaction():` in both `issue_gift_card` and `redeem_gift_card`"
+        },
+        {
+          "text": "no_unnecessary_orchestrator",
+          "passed": true,
+          "evidence": "Explicitly walked the decision tree ('\u00bfel caso de uso muta exactamente una instancia de agregado? \u2192 S\u00ed... \u00a710.1') and named the Middle Man smell as the reason not to add one"
+        },
+        {
+          "text": "narrow_domain_exception",
+          "passed": true,
+          "evidence": "`GiftCardNotActiveError`, `GiftCardExpiredError`, `InsufficientGiftCardBalanceError`, `GiftCardNotFoundError` \u2014 one per invalid transition, all subclassing `commons.domain.exceptions`"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 138.0,
+        "tokens": 79904,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "orchestrator_calls_services_not_repo",
+          "passed": true,
+          "evidence": "cancel_order_orchestrator.py calls orders.get_order/orders.cancel_order/stock.release_stock (service functions); never uow.repo(...) or an aggregate method"
+        },
+        {
+          "text": "correct_orchestration_tier",
+          "passed": true,
+          "evidence": "Explicitly walked the \u00a710 decision tree in prose before writing code and concluded \u00a710.2 (same product, product-level orchestrator)"
+        },
+        {
+          "text": "atomicity_via_nested_transactions",
+          "passed": true,
+          "evidence": "Orchestrator opens `with uow.transaction():`; explains nested calls join it per \u00a78's re-entrancy check, cites the exact code path"
+        },
+        {
+          "text": "new_release_stock_function",
+          "passed": true,
+          "evidence": "commerce/stock/services/stock.py::release_stock(...) created, symmetric to reserve_stock but a distinct function"
+        },
+        {
+          "text": "orchestrator_no_domain_import",
+          "passed": true,
+          "evidence": "Orchestrator only imports service modules (orders, stock) plus commerce.orders.domain.model.value_objects (aliased order_value_objects) solely for type-hinting the order_id parameter \u2014 never aggregate.py or adapters/. See eval_feedback: this VO-for-typing import is a defensible but literally-unaddressed edge case against contract 6's wording."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 63.8,
+        "tokens": 64059,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "root_cause_identified",
+          "passed": true,
+          "evidence": "Quotes the exact base class: `record_event()` only appends to `_events`; walks the full 5-step pipeline and states 'el evento queda en memoria... nadie lo lee jam\u00e1s' when step 2/3 is skipped"
+        },
+        {
+          "text": "outbox_pattern_explained",
+          "passed": true,
+          "evidence": "Names the outbox explicitly, distinguishes it from direct publish, cites 'Postgres... no te da un write transaccional cruzado contra una cola externa' as the reason it's needed"
+        },
+        {
+          "text": "same_transaction_emphasized",
+          "passed": true,
+          "evidence": "'pull_events() y uow.outbox.record(event) deben ir DENTRO del mismo bloque with uow.transaction() que la mutaci\u00f3n del agregado'"
+        },
+        {
+          "text": "shows_corrected_code",
+          "passed": true,
+          "evidence": "Shows the corrected reserve_stock with _publish_events added, diffed against the broken version"
+        },
+        {
+          "text": "mentions_relay_process",
+          "passed": true,
+          "evidence": "'relay (cron) \u2192 lee filas sin publicar, publica a SNS/EventBridge' as step 4 of the pipeline, plus a dedicated 'relay no est\u00e1 corriendo' diagnostic branch"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.3,
+        "passed": 3,
+        "failed": 7,
+        "total": 10,
+        "time_seconds": 236.9,
+        "tokens": 72087,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "naming_correct",
+          "passed": true,
+          "evidence": "Folder is commerce/gift_card/, matching snake_case(GiftCard) \u2014 but coincidental: no rule was cited, the agent stated it was guessing a generic convention and told the user to adjust names to their own codebase"
+        },
+        {
+          "text": "module_qualified_imports",
+          "passed": false,
+          "evidence": "Imports classes directly throughout, e.g. `from commerce.gift_card.domain.events import (DomainEvent, GiftCardExpired, GiftCardIssued, GiftCardRedeemed)` and `from commerce.gift_card.domain.model import GiftCard, GiftCardCode, GiftCardStatus, Money`"
+        },
+        {
+          "text": "typed_id_used",
+          "passed": false,
+          "evidence": "`GiftCard.id: uuid.UUID` \u2014 a raw UUID, no GiftCardId wrapper type anywhere"
+        },
+        {
+          "text": "money_used_for_balance",
+          "passed": false,
+          "evidence": "Hand-rolled its own `Money` class from scratch (with `__slots__`, manual `object.__setattr__` immutability) instead of the standard's `commons.domain.money.NonNegativeMoney`/`PositiveMoney` \u2014 reasonable engineering on its own, but not this standard"
+        },
+        {
+          "text": "posixtime_for_timestamps",
+          "passed": false,
+          "evidence": "Uses `datetime.now(timezone.utc)` throughout and `DateTime(timezone=True)` ORM columns \u2014 exactly the pattern this standard explicitly forbids (\u00a71.8/\u00a720)"
+        },
+        {
+          "text": "strenum_for_status",
+          "passed": false,
+          "evidence": "`class GiftCardStatus(str, Enum):` \u2014 the old mixin form this standard explicitly replaced with `enum.StrEnum`"
+        },
+        {
+          "text": "event_recorded_correctly",
+          "passed": false,
+          "evidence": "Events are plain `@dataclass(frozen=True)` appended via `self.events.append(...)` \u2014 no `AggregateRoot`/`record_event()` mechanism exists in this answer at all (a different, self-invented event-collection design)"
+        },
+        {
+          "text": "events_drained_in_service",
+          "passed": false,
+          "evidence": "`message_bus.dispatch(uow)` is called AFTER `uow.commit()` inside the API layer, with no outbox table \u2014 the exact 'publish-after-commit, no durability guarantee' anti-pattern this standard's \u00a711.2/\u00a720 documents. The answer's own 'production notes' section (item 3) correctly *identifies* this as a real gap requiring a transactional outbox, but the shipped code doesn't implement one."
+        },
+        {
+          "text": "no_unnecessary_orchestrator",
+          "passed": true,
+          "evidence": "No orchestrator layer was introduced for this single-aggregate case \u2014 though this is also just the path of least resistance without any standard's decision tree to consult"
+        },
+        {
+          "text": "narrow_domain_exception",
+          "passed": true,
+          "evidence": "GiftCardNotActiveError, GiftCardExpiredError, InsufficientBalanceError, etc. \u2014 narrow, named exceptions, same spirit as the standard even without knowing its exact hierarchy"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 5,
+        "total": 5,
+        "time_seconds": 159.3,
+        "tokens": 58864,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "orchestrator_calls_services_not_repo",
+          "passed": false,
+          "evidence": "There is no separate service-layer function per subcontext \u2014 the single `cancel_order` use-case function calls `uow.orders.get(order_id)` and `uow.stock.get_by_sku(line.sku)` (repositories) directly, then `order.cancel(...)`/`stock.release_reservation(...)` (aggregate methods) directly"
+        },
+        {
+          "text": "correct_orchestration_tier",
+          "passed": false,
+          "evidence": "No orchestrator/service-layer split exists at all; one flat application-service function does everything for both aggregates"
+        },
+        {
+          "text": "atomicity_via_nested_transactions",
+          "passed": false,
+          "evidence": "Atomicity comes from one flat `async with uow: ... await uow.commit()` around the whole function, not from composing separate per-subcontext service functions that nest their own transactions"
+        },
+        {
+          "text": "new_release_stock_function",
+          "passed": false,
+          "evidence": "No stock-side service function exists; `stock.release_reservation(line.reservation_id)` \u2014 a domain method \u2014 is called directly inline from the flat use case"
+        },
+        {
+          "text": "orchestrator_no_domain_import",
+          "passed": false,
+          "evidence": "The use-case function imports and directly manipulates both aggregates (`order.cancel(...)`, `stock.release_reservation(...)`) \u2014 the exact 'reach past the service into the aggregate' shape this standard's rule exists to prevent"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 81.9,
+        "tokens": 48939,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "root_cause_identified",
+          "passed": true,
+          "evidence": "'el evento queda en memoria, colgado del objeto Python. Nada lo saca de ah\u00ed autom\u00e1ticamente' \u2014 same core diagnosis as the with-skill run, using generic Cosmic-Python terminology (collect_new_events/repo.seen) instead of this standard's exact API names (pull_events/uow.outbox.record)"
+        },
+        {
+          "text": "outbox_pattern_explained",
+          "passed": true,
+          "evidence": "Dedicated 'El fix seg\u00fan el est\u00e1ndar (outbox transaccional)' section, explicit dual-write reasoning for why direct publish is unsafe"
+        },
+        {
+          "text": "same_transaction_emphasized",
+          "passed": true,
+          "evidence": "'escrib\u00eds el evento en una tabla outbox DENTRO de la misma transacci\u00f3n de PostgreSQL que persiste el agregado'"
+        },
+        {
+          "text": "shows_corrected_code",
+          "passed": true,
+          "evidence": "Shows OutboxRecord model + persist_events_to_outbox + a worker/cron publisher"
+        },
+        {
+          "text": "mentions_relay_process",
+          "passed": true,
+          "evidence": "'Un proceso aparte (poller o CDC) lee la tabla y publica a SQS con reintentos'"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 217.0,
+        "stddev": 204.4848,
+        "min": 63.8,
+        "max": 449.2
+      },
+      "tokens": {
+        "mean": 86776.3333,
+        "stddev": 26822.1417,
+        "min": 64059,
+        "max": 116366
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.4333,
+        "stddev": 0.5132,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 159.3667,
+        "stddev": 77.5,
+        "min": 81.9,
+        "max": 236.9
+      },
+      "tokens": {
+        "mean": 59963.3333,
+        "stddev": 11613.0907,
+        "min": 48939,
+        "max": 72087
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.57",
+      "time_seconds": "+57.6",
+      "tokens": "+26813"
+    }
+  },
+  "notes": [
+    "Eval 1 (gift-card-context) and Eval 2 (cancel-order-release-stock) are the strongest, cleanest signal: with-skill scores 10/10 and 5/5 by correctly applying house-specific conventions (typed IDs, PosixTime, StrEnum, Money, module-qualified imports, the orchestrator-calls-services-not-repo rule) that the baseline has no way to know and consistently violates instead (raw UUIDs, datetime, old str-Enum mixin, hand-rolled Money, direct-class imports, and — most importantly — collapsing the orchestrator/service distinction into one flat function that reaches into both repositories and both aggregates directly in eval 2).",
+    "Eval 3 (event-never-published-debug) does NOT discriminate well as currently written: both configurations score 5/5 because the transactional outbox pattern being tested is well-known generic DDD/event-driven knowledge, not something unique to this standard. The real differentiator the with-skill run demonstrates — catching the DomainEvent-vs-IntegrationEvent relay-eligibility gotcha and using this codebase's exact API names (pull_events/uow.outbox.record) instead of generic terminology (collect_new_events/EVENT_HANDLERS) — isn't covered by any of the 5 assertions. Recommend tightening this eval before trusting it as a signal: add an assertion for the IntegrationEvent distinction specifically.",
+    "A genuine ambiguity in the skill itself was surfaced by eval 2, not a model failure: the orchestrator in the with-skill run imports a sibling subcontext's domain.model.value_objects module purely to type-hint an id parameter. Import-linter contract 6 as written ('never any subcontext's domain or adapters module') doesn't carve this out, even though it's clearly harmless (no business logic touched) and arguably necessary. Worth an explicit clarification in enforcement-and-style.md before this trips up a real import-linter run.",
+    "Both baseline runs independently reach for solid, defensible engineering (optimistic/pessimistic locking, idempotency-by-design, transactional outbox) — the skill's value isn't 'produces correct DDD code' (a strong model does that anyway) but 'produces code that matches THIS codebase's specific, already-established conventions,' which is exactly what a second engineer reading the diff needs and exactly what eval 1/2's assertions were designed to catch.",
+    "Time/token cost: with-skill runs took roughly 2-4x longer and used 1.5-2x more tokens than baseline (see run_summary deltas) — expected, since the with-skill runs read SKILL.md plus 2-3 reference files before answering. Worth keeping an eye on for simpler future tasks where a lighter read might suffice, but not a concern for tasks of this complexity."
+  ]
+}

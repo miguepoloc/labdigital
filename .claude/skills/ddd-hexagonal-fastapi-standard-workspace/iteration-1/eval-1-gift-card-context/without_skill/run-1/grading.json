@@ -1,0 +1,19 @@
+{
+  "expectations": [
+    {"text": "naming_correct", "passed": true, "evidence": "Folder is commerce/gift_card/, matching snake_case(GiftCard) — but coincidental: no rule was cited, the agent stated it was guessing a generic convention and told the user to adjust names to their own codebase"},
+    {"text": "module_qualified_imports", "passed": false, "evidence": "Imports classes directly throughout, e.g. `from commerce.gift_card.domain.events import (DomainEvent, GiftCardExpired, GiftCardIssued, GiftCardRedeemed)` and `from commerce.gift_card.domain.model import GiftCard, GiftCardCode, GiftCardStatus, Money`"},
+    {"text": "typed_id_used", "passed": false, "evidence": "`GiftCard.id: uuid.UUID` — a raw UUID, no GiftCardId wrapper type anywhere"},
+    {"text": "money_used_for_balance", "passed": false, "evidence": "Hand-rolled its own `Money` class from scratch (with `__slots__`, manual `object.__setattr__` immutability) instead of the standard's `commons.domain.money.NonNegativeMoney`/`PositiveMoney` — reasonable engineering on its own, but not this standard"},
+    {"text": "posixtime_for_timestamps", "passed": false, "evidence": "Uses `datetime.now(timezone.utc)` throughout and `DateTime(timezone=True)` ORM columns — exactly the pattern this standard explicitly forbids (§1.8/§20)"},
+    {"text": "strenum_for_status", "passed": false, "evidence": "`class GiftCardStatus(str, Enum):` — the old mixin form this standard explicitly replaced with `enum.StrEnum`"},
+    {"text": "event_recorded_correctly", "passed": false, "evidence": "Events are plain `@dataclass(frozen=True)` appended via `self.events.append(...)` — no `AggregateRoot`/`record_event()` mechanism exists in this answer at all (a different, self-invented event-collection design)"},
+    {"text": "events_drained_in_service", "passed": false, "evidence": "`message_bus.dispatch(uow)` is called AFTER `uow.commit()` inside the API layer, with no outbox table — the exact 'publish-after-commit, no durability guarantee' anti-pattern this standard's §11.2/§20 documents. The answer's own 'production notes' section (item 3) correctly *identifies* this as a real gap requiring a transactional outbox, but the shipped code doesn't implement one."},
+    {"text": "no_unnecessary_orchestrator", "passed": true, "evidence": "No orchestrator layer was introduced for this single-aggregate case — though this is also just the path of least resistance without any standard's decision tree to consult"},
+    {"text": "narrow_domain_exception", "passed": true, "evidence": "GiftCardNotActiveError, GiftCardExpiredError, InsufficientBalanceError, etc. — narrow, named exceptions, same spirit as the standard even without knowing its exact hierarchy"}
+  ],
+  "summary": {"passed": 3, "failed": 7, "total": 10, "pass_rate": 0.3},
+  "timing": {"executor_duration_seconds": 236.9, "total_tokens": 72087},
+  "eval_feedback": {
+    "overall": "A genuinely competent, production-minded answer on its own terms (it independently reaches for optimistic/pessimistic locking, idempotency keys, and even names the transactional outbox as the correct fix for its own known gap) — but it invents its own conventions everywhere the standard makes a specific, deliberate choice (PosixTime, StrEnum, Money, typed IDs, module imports, the record_event/outbox mechanism). This is the expected and desired gap for this eval: it shows the skill's value isn't 'can a good model write DDD code' (yes, clearly) but 'does it match THIS codebase's specific, already-established conventions so a second engineer reading it doesn't hit a wall of unfamiliar patterns.'"
+  }
+}

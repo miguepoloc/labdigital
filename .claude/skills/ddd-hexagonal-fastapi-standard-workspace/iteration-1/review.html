@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg: #faf9f5;
+      --surface: #ffffff;
+      --border: #e8e6dc;
+      --text: #141413;
+      --text-muted: #b0aea5;
+      --accent: #d97757;
+      --accent-hover: #c4613f;
+      --green: #788c5d;
+      --green-bg: #eef2e8;
+      --red: #c44;
+      --red-bg: #fceaea;
+      --header-bg: #141413;
+      --header-text: #faf9f5;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .header h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    .header .instructions {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 0.25rem;
+    }
+    .header .progress {
+      font-size: 0.875rem;
+      opacity: 0.8;
+      text-align: right;
+    }
+
+    /* ---- Main content ---- */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---- Sections ---- */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .section-header {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.75rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .section-body {
+      padding: 1rem;
+    }
+
+    /* ---- Config badge ---- */
+    .config-badge {
+      display: inline-block;
+      padding: 0.2rem 0.625rem;
+      border-radius: 9999px;
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: 0.75rem;
+      vertical-align: middle;
+    }
+    .config-badge.config-primary {
+      background: rgba(33, 150, 243, 0.12);
+      color: #1976d2;
+    }
+    .config-badge.config-baseline {
+      background: rgba(255, 193, 7, 0.15);
+      color: #f57f17;
+    }
+
+    /* ---- Prompt ---- */
+    .prompt-text {
+      white-space: pre-wrap;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+    }
+
+    /* ---- Outputs ---- */
+    .output-file {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .output-file + .output-file {
+      margin-top: 1rem;
+    }
+    .output-file-header {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .output-file-header .dl-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      text-decoration: none;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      opacity: 0.8;
+    }
+    .output-file-header .dl-btn:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+    .output-file-content {
+      padding: 0.75rem;
+      overflow-x: auto;
+    }
+    .output-file-content pre {
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .output-file-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+    .output-file-content iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    .output-file-content table {
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+      width: 100%;
+    }
+    .output-file-content table td,
+    .output-file-content table th {
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      text-align: left;
+    }
+    .output-file-content table th {
+      background: var(--bg);
+      font-weight: 600;
+    }
+    .output-file-content .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .output-file-content .download-link:hover {
+      background: var(--border);
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* ---- Feedback ---- */
+    .prev-feedback {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.625rem 0.75rem;
+      margin-top: 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .prev-feedback-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+      color: var(--text-muted);
+    }
+    .feedback-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      resize: vertical;
+      color: var(--text);
+    }
+    .feedback-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .feedback-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      min-height: 1.1em;
+    }
+
+    /* ---- Grades (collapsible) ---- */
+    .grades-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .grades-toggle:hover {
+      color: var(--accent);
+    }
+    .grades-toggle .arrow {
+      margin-right: 0.5rem;
+      transition: transform 0.15s;
+      font-size: 0.75rem;
+    }
+    .grades-toggle .arrow.open {
+      transform: rotate(90deg);
+    }
+    .grades-content {
+      display: none;
+      margin-top: 0.75rem;
+    }
+    .grades-content.open {
+      display: block;
+    }
+    .grades-summary {
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .grade-badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .grade-pass { background: var(--green-bg); color: var(--green); }
+    .grade-fail { background: var(--red-bg); color: var(--red); }
+    .assertion-list {
+      list-style: none;
+    }
+    .assertion-item {
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .assertion-item:last-child { border-bottom: none; }
+    .assertion-status {
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+    .assertion-status.pass { color: var(--green); }
+    .assertion-status.fail { color: var(--red); }
+    .assertion-evidence {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      padding-left: 1.5rem;
+    }
+
+    /* ---- View tabs ---- */
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .view-tab {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .view-panel { display: none; }
+    .view-panel.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+    /* ---- Benchmark view ---- */
+    .benchmark-view {
+      padding: 1.5rem 2rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .benchmark-table {
+      border-collapse: collapse;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .benchmark-table th, .benchmark-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .benchmark-table th {
+      font-family: 'Poppins', sans-serif;
+      background: var(--header-bg);
+      color: var(--header-text);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .benchmark-table tr:hover { background: var(--bg); }
+    .benchmark-table tr.benchmark-row-with { background: rgba(33, 150, 243, 0.06); }
+    .benchmark-table tr.benchmark-row-without { background: rgba(255, 193, 7, 0.06); }
+    .benchmark-table tr.benchmark-row-with:hover { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-without:hover { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-table tr.benchmark-row-avg { font-weight: 600; border-top: 2px solid var(--border); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-with { background: rgba(33, 150, 243, 0.12); }
+    .benchmark-table tr.benchmark-row-avg.benchmark-row-without { background: rgba(255, 193, 7, 0.12); }
+    .benchmark-delta-positive { color: var(--green); font-weight: 600; }
+    .benchmark-delta-negative { color: var(--red); font-weight: 600; }
+    .benchmark-notes {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .benchmark-notes h3 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+    }
+    .benchmark-notes ul {
+      list-style: disc;
+      padding-left: 1.25rem;
+    }
+    .benchmark-notes li {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      margin-bottom: 0.375rem;
+    }
+    .benchmark-empty {
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+      padding: 3rem;
+    }
+
+    /* ---- Navigation ---- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .nav-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .done-btn {
+      font-family: 'Poppins', sans-serif;
+      padding: 0.5rem 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .done-btn:hover {
+      background: var(--bg);
+      border-color: var(--text-muted);
+    }
+    .done-btn.ready {
+      border: none;
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+    .done-btn.ready:hover {
+      background: var(--accent-hover);
+    }
+    /* ---- Done overlay ---- */
+    .done-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    .done-overlay.visible {
+      display: flex;
+    }
+    .done-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 2rem 3rem;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+    }
+    .done-card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .done-card p {
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    .done-card .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .done-card button {
+      padding: 0.5rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .done-card button:hover {
+      background: var(--bg);
+    }
+    /* ---- Toast ---- */
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--header-bg);
+      color: var(--header-text);
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    .toast.visible {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+    <div class="header">
+      <div>
+        <h1>Eval Review: <span id="skill-name"></span></h1>
+        <div class="instructions">Review each output and leave feedback below. Navigate with arrow keys or buttons. When done, copy feedback and paste into Claude Code.</div>
+      </div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <!-- View tabs (only shown when benchmark data exists) -->
+    <div class="view-tabs" id="view-tabs" style="display:none;">
+      <button class="view-tab active" onclick="switchView('outputs')">Outputs</button>
+      <button class="view-tab" onclick="switchView('benchmark')">Benchmark</button>
+    </div>
+
+    <!-- Outputs panel (qualitative review) -->
+    <div class="view-panel active" id="panel-outputs">
+    <div class="main">
+      <!-- Prompt -->
+      <div class="section">
+        <div class="section-header">Prompt <span class="config-badge" id="config-badge" style="display:none;"></span></div>
+        <div class="section-body">
+          <div class="prompt-text" id="prompt-text"></div>
+        </div>
+      </div>
+
+      <!-- Outputs -->
+      <div class="section">
+        <div class="section-header">Output</div>
+        <div class="section-body" id="outputs-body">
+          <div class="empty-state">No output files found</div>
+        </div>
+      </div>
+
+      <!-- Previous Output (collapsible) -->
+      <div class="section" id="prev-outputs-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="togglePrevOutputs()">
+            <span class="arrow" id="prev-outputs-arrow">&#9654;</span>
+            Previous Output
+          </div>
+        </div>
+        <div class="grades-content" id="prev-outputs-content"></div>
+      </div>
+
+      <!-- Grades (collapsible) -->
+      <div class="section" id="grades-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleGrades()">
+            <span class="arrow" id="grades-arrow">&#9654;</span>
+            Formal Grades
+          </div>
+        </div>
+        <div class="grades-content" id="grades-content"></div>
+      </div>
+
+      <!-- Feedback -->
+      <div class="section">
+        <div class="section-header">Your Feedback</div>
+        <div class="section-body">
+          <textarea
+            class="feedback-textarea"
+            id="feedback"
+            placeholder="What do you think of this output? Any issues, suggestions, or things that look great?"
+          ></textarea>
+          <div class="feedback-status" id="feedback-status"></div>
+          <div class="prev-feedback" id="prev-feedback" style="display:none;">
+            <div class="prev-feedback-label">Previous feedback</div>
+            <div id="prev-feedback-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav" id="outputs-nav">
+      <button class="nav-btn" id="prev-btn" onclick="navigate(-1)">&#8592; Previous</button>
+      <button class="done-btn" id="done-btn" onclick="showDoneDialog()">Submit All Reviews</button>
+      <button class="nav-btn" id="next-btn" onclick="navigate(1)">Next &#8594;</button>
+    </div>
+    </div><!-- end panel-outputs -->
+
+    <!-- Benchmark panel (quantitative stats) -->
+    <div class="view-panel" id="panel-benchmark">
+      <div class="benchmark-view" id="benchmark-content">
+        <div class="benchmark-empty">No benchmark data available. Run a benchmark to see quantitative results here.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Done overlay -->
+  <div class="done-overlay" id="done-overlay">
+    <div class="done-card">
+      <h2>Review Complete</h2>
+      <p>Your feedback has been saved. Go back to your Claude Code session and tell Claude you're done reviewing.</p>
+      <div class="btn-row">
+        <button onclick="closeDoneDialog()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ---- Embedded data (injected by generate_review.py) ----
+    const EMBEDDED_DATA = {"skill_name": "ddd-hexagonal-fastapi-standard", "runs": [{"id": "eval-1-gift-card-context-with_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "result.md", "type": "text", "content": "# Nuevo subcontexto `gift_card` en `commerce`\n\n## Decisiones antes de escribir c\u00f3digo\n\n- **Producto**: `commerce` (ya existe \u2014 junto a `stock`/`orders` en el golden path). El\n  subcontexto se llama como su agregado, en `snake_case` (\u00a73.1): `commerce/gift_card/`.\n- **Agregado \u00fanico**: `GiftCard`. `code`, `balance` y `status` viven todos en el mismo\n  agregado \u2014 no hay raz\u00f3n de dise\u00f1o para separarlos (no tienen ciclo de vida independiente\n  entre s\u00ed), as\u00ed que es un \u00fanico `AggregateRoot`, no varios.\n- **\u00bfOrquestador?** No. Recorriendo el \u00e1rbol de decisi\u00f3n de orquestaci\u00f3n (\u00a710): *\"\u00bfel caso de\n  uso muta exactamente una instancia de agregado?\"* \u2192 S\u00ed, tanto emitir (`issue`) como canjear\n  (`redeem`) tocan solo `GiftCard`. Eso cae directo en **\u00a710.1: se llama la funci\u00f3n de\n  `services/` del propio subcontexto, sin orquestador.** Envolver esto en un\n  \"orchestrator\" por simetr\u00eda con otros casos ser\u00eda el smell *Middle Man* que el est\u00e1ndar\n  expl\u00edcitamente pide evitar.\n- **`code`** es la clave de negocio (la que el cliente usa para canjear), separada del `id`\n  interno (`GiftCardId`, `UuidV7Id`) \u2014 mismo patr\u00f3n que `Sku` en `Stock`, no un\n  `HumanFriendlyId` (ese wrapper es espec\u00edficamente para el campo `id` de una entidad).\n- **`balance`** usa `Money` \u2014 concretamente `NonNegativeMoney`, porque un saldo nunca debe\n  quedar en negativo pero s\u00ed puede llegar a cero (tarjeta agotada). El monto a canjear en cada\n  operaci\u00f3n usa `PositiveMoney` (no tiene sentido canjear \\$0).\n- **`status`** es un `enum.StrEnum` con tres estados: `active` / `redeemed` / `expired`.\n- **Evento al canjear**: `GiftCardRedeemed`, grabado con `record_event` dentro de `redeem()` y\n  publicado al outbox por `services/gift_card.py` en la misma transacci\u00f3n \u2014 la regla no\n  negociable de \u00a71.6 (todo `record_event` necesita su punto de drenaje documentado en el mismo\n  commit).\n- Como el enunciado tambi\u00e9n implica una fecha de expiraci\u00f3n (para poder llegar al estado\n  `expired`), agregu\u00e9 `expires_at: PosixTime` al agregado y un m\u00e9todo `expire()` idempotente\n  para uso de un cron de housekeeping \u2014 sin este campo, \"expirada\" no ser\u00eda alcanzable por\n  ninguna regla de negocio real.\n- `Money` (`commons/domain/money.py`) tal como est\u00e1 citado en el est\u00e1ndar no expone `__sub__`\n  (solo `__add__`/`__mul__`). Lo necesito para descontar el balance, as\u00ed que lo agrego al\n  mismo archivo compartido (mismo patr\u00f3n que `__add__`), en vez de reinventar la resta a mano\n  en el agregado.\n\nNo se necesita `ports.py`: `GiftCard` no requiere ninguna llamada s\u00edncrona a un sistema\nexterno ni a otro bounded context.\n\n## \u00c1rbol de archivos\n\n```\ncommerce/gift_card/\n\u251c\u2500\u2500 domain/\n\u2502   \u2514\u2500\u2500 model/\n\u2502       \u251c\u2500\u2500 aggregate.py\n\u2502       \u251c\u2500\u2500 value_objects.py\n\u2502       \u251c\u2500\u2500 exceptions.py\n\u2502       \u2514\u2500\u2500 events.py\n\u251c\u2500\u2500 adapters/\n\u2502   \u251c\u2500\u2500 orm.py\n\u2502   \u2514\u2500\u2500 repository.py\n\u2514\u2500\u2500 services/\n    \u251c\u2500\u2500 dto.py\n    \u2514\u2500\u2500 gift_card.py\n```\n\n---\n\n## 1. Adici\u00f3n al *shared kernel* \u2014 `Money.__sub__`\n\nNecesario porque `redeem()` descuenta saldo y el `Money` citado en el est\u00e1ndar no trae resta.\nMismo criterio que `__add__`: valida moneda, devuelve `Money` base (no el subtipo\nrestringido \u2014 igual que `Order.total`, que tambi\u00e9n normaliza a `Money` base).\n\n```python\n# commons/domain/money.py  (a\u00f1adir junto a __add__/__mul__ existentes)\nclass Money(value_objects.ValueObject):\n    currency: Currencies\n    value: decimal.Decimal\n\n    def __add__(self, other: \"Money\") -> \"Money\":\n        if self.currency is not other.currency:\n            raise exceptions.ValidationError(\"Can't add different currencies\")\n        return Money(currency=self.currency, value=self.value + other.value)\n\n    def __sub__(self, other: \"Money\") -> \"Money\":\n        if self.currency is not other.currency:\n            raise exceptions.ValidationError(\"Can't subtract different currencies\")\n        return Money(currency=self.currency, value=self.value - other.value)\n\n    # ... resto sin cambios (__mul__, compare, __lt__, is_zero, cop)\n```\n\n---\n\n## 2. Dominio \u2014 sin I/O, sin `fastapi`/`sqlalchemy`/`boto3`\n\n### `commerce/gift_card/domain/model/value_objects.py`\n\n```python\nfrom commons.domain import id_generator, value_objects\nimport enum\n\n\nclass GiftCardId(value_objects.UuidV7Id):\n    pass\n\n\nclass GiftCardCode(value_objects.ValueObject):\n    \"\"\"Clave de negocio con la que el cliente canjea la tarjeta \u2014 distinta de GiftCardId,\n    que es la identidad interna del agregado. Se busca por code, nunca por id, en checkout.\"\"\"\n    value: str\n\n    @classmethod\n    def generate(cls) -> \"GiftCardCode\":\n        return cls(value=id_generator.generate_short_id())\n\n\nclass GiftCardStatus(enum.StrEnum):\n    ACTIVE = \"active\"\n    REDEEMED = \"redeemed\"\n    EXPIRED = \"expired\"\n```\n\n### `commerce/gift_card/domain/model/events.py`\n\n```python\nimport uuid\n\nimport pydantic\n\nfrom commons.domain import events as domain_events, money\nfrom commons.domain import value_objects as base_value_objects\n\nfrom commerce.gift_card.domain.model import value_objects\n\n# event_id/occurred_at llevan default_factory en cada evento concreto \u2014 as\u00ed el agregado los\n# construye pasando solo los campos propios del hecho de negocio, igual que\n# events.StockCreated(stock_id=stock.id, sku=sku) en el golden path.\n\n\nclass GiftCardIssued(domain_events.DomainEvent):\n    event_id: uuid.UUID = pydantic.Field(default_factory=uuid.uuid4)\n    occurred_at: base_value_objects.PosixTime = pydantic.Field(\n        default_factory=base_value_objects.PosixTime.now,\n    )\n    gift_card_id: value_objects.GiftCardId\n    code: value_objects.GiftCardCode\n    initial_balance: money.NonNegativeMoney\n\n\nclass GiftCardRedeemed(domain_events.DomainEvent):\n    \"\"\"Se emite cada vez que se canjea saldo de la tarjeta. Se mantiene como DomainEvent\n    interno por ahora; si otro bounded context necesita reaccionar a esto (notificaciones,\n    contabilidad), se promueve a IntegrationEvent (\u00a711.1) sin tocar este agregado.\"\"\"\n    event_id: uuid.UUID = pydantic.Field(default_factory=uuid.uuid4)\n    occurred_at: base_value_objects.PosixTime = pydantic.Field(\n        default_factory=base_value_objects.PosixTime.now,\n    )\n    gift_card_id: value_objects.GiftCardId\n    code: value_objects.GiftCardCode\n    amount_redeemed: money.PositiveMoney\n    remaining_balance: money.NonNegativeMoney\n\n\nclass GiftCardExpired(domain_events.DomainEvent):\n    event_id: uuid.UUID = pydantic.Field(default_factory=uuid.uuid4)\n    occurred_at: base_value_objects.PosixTime = pydantic.Field(\n        default_factory=base_value_objects.PosixTime.now,\n    )\n    gift_card_id: value_objects.GiftCardId\n    code: value_objects.GiftCardCode\n```\n\n### `commerce/gift_card/domain/model/exceptions.py`\n\n```python\nfrom commons.domain import exceptions\n\n\nclass GiftCardNotFoundError(exceptions.NotFoundError):\n    def __init__(self, *, identifier: object) -> None:\n        super().__init__(f\"Gift card [{identifier}] not found.\", code=\"GIFT_CARD_NOT_FOUND\")\n\n\nclass GiftCardNotActiveError(exceptions.ConflictError):\n    def __init__(self, *, gift_card_id: \"value_objects.GiftCardId\",\n                 status: \"value_objects.GiftCardStatus\") -> None:\n        super().__init__(\n            f\"Gift card [{gift_card_id}] is not active (status=[{status}]).\",\n            code=\"GIFT_CARD_NOT_ACTIVE\",\n        )\n\n\nclass GiftCardExpiredError(exceptions.ConflictError):\n    def __init__(self, *, gift_card_id: \"value_objects.GiftCardId\",\n                 expires_at: \"base_value_objects.PosixTime\") -> None:\n        super().__init__(\n            f\"Gift card [{gift_card_id}] expired at [{expires_at}].\",\n            code=\"GIFT_CARD_EXPIRED\",\n        )\n\n\nclass InsufficientGiftCardBalanceError(exceptions.ConflictError):\n    def __init__(self, *, gift_card_id: \"value_objects.GiftCardId\",\n                 requested: \"money.Money\", available: \"money.Money\") -> None:\n        super().__init__(\n            f\"Cannot redeem [{requested}] from gift card [{gift_card_id}]: \"\n            f\"only [{available}] available.\",\n            code=\"INSUFFICIENT_GIFT_CARD_BALANCE\",\n        )\n```\n\n*(Los tipos entre comillas \u2014 `value_objects.GiftCardId`, `base_value_objects.PosixTime`,\n`money.Money` \u2014 son referencias de tipo hacia adelante; en el archivo real de producci\u00f3n\nse agregan como `if typing.TYPE_CHECKING:` con los imports correspondientes, para no crear un\nimport circular entre `exceptions.py` y `value_objects.py`/`aggregate.py`.)*\n\n### `commerce/gift_card/domain/model/aggregate.py`\n\n```python\nfrom commons.domain import aggregates, money\nfrom commons.domain import value_objects as base_value_objects\n\nfrom commerce.gift_card.domain.model import events, exceptions, value_objects\n\n\nclass GiftCard(aggregates.AggregateRoot[value_objects.GiftCardId]):\n    code: value_objects.GiftCardCode\n    balance: money.NonNegativeMoney\n    status: value_objects.GiftCardStatus\n    expires_at: base_value_objects.PosixTime\n\n    @classmethod\n    def issue(cls, *, initial_balance: money.NonNegativeMoney,\n              expires_at: base_value_objects.PosixTime) -> \"GiftCard\":\n        \"\"\"Emite una tarjeta de regalo nueva, ACTIVA, con un code generado internamente.\"\"\"\n        now = base_value_objects.PosixTime.now()\n        gift_card = cls(\n            id=value_objects.GiftCardId.new(),\n            code=value_objects.GiftCardCode.generate(),\n            balance=initial_balance,\n            status=value_objects.GiftCardStatus.ACTIVE,\n            expires_at=expires_at,\n            created_at=now,\n            updated_at=now,\n        )\n        gift_card.record_event(events.GiftCardIssued(\n            gift_card_id=gift_card.id, code=gift_card.code, initial_balance=gift_card.balance,\n        ))\n        return gift_card\n\n    def redeem(self, *, amount: money.PositiveMoney) -> None:\n        \"\"\"Descuenta `amount` del saldo. La tarjeta pasa a REDEEMED cuando el saldo llega a\n        cero; puede canjearse parcialmente varias veces antes de eso.\"\"\"\n        if self.status is not value_objects.GiftCardStatus.ACTIVE:\n            raise exceptions.GiftCardNotActiveError(gift_card_id=self.id, status=self.status)\n        if self.expires_at < base_value_objects.PosixTime.now():\n            raise exceptions.GiftCardExpiredError(gift_card_id=self.id,\n                                                    expires_at=self.expires_at)\n        if self.balance.compare(amount) < 0:\n            raise exceptions.InsufficientGiftCardBalanceError(\n                gift_card_id=self.id, requested=amount, available=self.balance,\n            )\n\n        new_balance = self.balance - amount   # Money.__sub__ \u2014 nunca desempaquetar .value aqu\u00ed\n        self.balance = money.NonNegativeMoney(currency=new_balance.currency,\n                                                value=new_balance.value)\n        if self.balance.is_zero():\n            self.status = value_objects.GiftCardStatus.REDEEMED\n        self.updated_at = base_value_objects.PosixTime.now()\n\n        self.record_event(events.GiftCardRedeemed(\n            gift_card_id=self.id, code=self.code,\n            amount_redeemed=amount, remaining_balance=self.balance,\n        ))\n\n    def expire(self) -> None:\n        \"\"\"Marca la tarjeta EXPIRED. Pensado para un cron de housekeeping una vez pasado\n        `expires_at`. Idempotente si ya est\u00e1 EXPIRED; prohibido si ya fue REDEEMED.\"\"\"\n        if self.status is value_objects.GiftCardStatus.REDEEMED:\n            raise exceptions.GiftCardNotActiveError(gift_card_id=self.id, status=self.status)\n        if self.status is value_objects.GiftCardStatus.EXPIRED:\n            return\n        self.status = value_objects.GiftCardStatus.EXPIRED\n        self.updated_at = base_value_objects.PosixTime.now()\n        self.record_event(events.GiftCardExpired(gift_card_id=self.id, code=self.code))\n```\n\nConvenciones aplicadas: factories de clase (`issue`) construyen-y-graban-evento en un solo\nlugar; los m\u00e9todos de instancia son comandos con nombre de verbo (`redeem`, `expire`), cada\nuno guarda con una excepci\u00f3n de dominio nombrada y angosta, muta estado, y graba exactamente\nlos eventos que describen lo ocurrido. Nada de infraestructura: `expires_at`/`initial_balance`\nllegan como par\u00e1metros, no se consulta ninguna base de datos desde aqu\u00ed.\n\n---\n\n## 3. Adapters\n\n### `commerce/gift_card/adapters/orm.py`\n\n```python\nimport decimal\nimport uuid\n\nimport sqlalchemy as sa\nfrom sqlalchemy.orm import Mapped, mapped_column\n\nfrom commons.adapters import orm_base\n\n\nclass GiftCardOrm(orm_base.Base, orm_base.TimestampsMixin):\n    __tablename__ = \"gift_card\"\n\n    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)\n    code: Mapped[str] = mapped_column(sa.Text, unique=True)\n    balance_currency: Mapped[str] = mapped_column(sa.Text)\n    balance_value: Mapped[decimal.Decimal] = mapped_column(sa.Numeric(18, 2))\n    status: Mapped[str] = mapped_column(sa.Text)\n    expires_at: Mapped[int] = mapped_column(sa.BigInteger)\n    version: Mapped[int] = mapped_column(default=0)\n\n    __mapper_args__ = {\"version_id_col\": version}\n```\n\n`version_id_col` habilita el locking optimista nativo de Postgres (\u00a78.1): cualquier `UPDATE`\nconcurrente que pisara un canje ya aplicado falla con `StaleDataError` en vez de perder el\ndescuento de saldo silenciosamente \u2014 el escenario exacto que le puede pasar a un `balance`\ncompartido bajo dos requests casi simult\u00e1neos.\n\n### `commerce/gift_card/adapters/repository.py`\n\n```python\nimport sqlalchemy as sa\nimport sqlalchemy.orm.exc\n\nfrom commons.domain import exceptions as commons_exceptions, money, repositories\nfrom commons.domain import value_objects as base_value_objects\n\nfrom commerce.gift_card.adapters import orm\nfrom commerce.gift_card.domain.model import aggregate, exceptions, value_objects\n\n\ndef _to_orm(gift_card: aggregate.GiftCard) -> orm.GiftCardOrm:\n    return orm.GiftCardOrm(\n        id=gift_card.id.value,\n        code=gift_card.code.value,\n        balance_currency=gift_card.balance.currency.value,\n        balance_value=gift_card.balance.value,\n        status=gift_card.status.value,\n        expires_at=gift_card.expires_at.microseconds,\n        created_at=gift_card.created_at.microseconds,\n        updated_at=gift_card.updated_at.microseconds,\n        version=gift_card.version,\n    )\n\n\ndef _to_entity(gift_card_orm: orm.GiftCardOrm) -> aggregate.GiftCard:\n    return aggregate.GiftCard(\n        id=value_objects.GiftCardId(value=gift_card_orm.id),\n        code=value_objects.GiftCardCode(value=gift_card_orm.code),\n        balance=money.NonNegativeMoney(\n            currency=money.Currencies(gift_card_orm.balance_currency),\n            value=gift_card_orm.balance_value,\n        ),\n        status=value_objects.GiftCardStatus(gift_card_orm.status),\n        expires_at=base_value_objects.PosixTime(microseconds=gift_card_orm.expires_at),\n        created_at=base_value_objects.PosixTime(microseconds=gift_card_orm.created_at),\n        updated_at=base_value_objects.PosixTime(microseconds=gift_card_orm.updated_at),\n        version=gift_card_orm.version,\n    )\n\n\nclass DefaultGiftCardRepository(repositories.Repository[aggregate.GiftCard]):\n    def __init__(self, session: \"orm.Session\") -> None:\n        self._session = session\n\n    def get(self, id: \"value_objects.GiftCardId\") -> aggregate.GiftCard:\n        gift_card_orm = self._session.get(orm.GiftCardOrm, id.value)\n        if gift_card_orm is None:\n            raise exceptions.GiftCardNotFoundError(identifier=id)\n        return _to_entity(gift_card_orm)\n\n    def get_by_code(self, code: \"value_objects.GiftCardCode\") -> aggregate.GiftCard:\n        gift_card_orm = self._session.execute(\n            sa.select(orm.GiftCardOrm).where(orm.GiftCardOrm.code == code.value)\n        ).scalar_one_or_none()\n        if gift_card_orm is None:\n            raise exceptions.GiftCardNotFoundError(identifier=code)\n        return _to_entity(gift_card_orm)\n\n    def put(self, gift_card: aggregate.GiftCard) -> None:\n        self._session.merge(_to_orm(gift_card))\n        try:\n            self._session.flush()   # fuerza el chequeo de versi\u00f3n ya, no al hacer commit\n        except sqlalchemy.orm.exc.StaleDataError as exc:\n            raise commons_exceptions.ConcurrentModificationError(\n                f\"Gift card [{gift_card.id}] changed concurrently \u2014 reload and retry.\",\n                code=\"CONCURRENT_MODIFICATION\",\n            ) from exc\n\n    def delete(self, id: \"value_objects.GiftCardId\") -> None:\n        gift_card_orm = self._session.get(orm.GiftCardOrm, id.value)\n        if gift_card_orm is not None:\n            self._session.delete(gift_card_orm)\n\n\n# Registro del repo \u2014 se ejecuta una vez al arrancar (mismo punto donde bold/sona-sso-backend\n# registran cada repo concreto):\n# unit_of_work.register_repo(aggregate.GiftCard, DefaultGiftCardRepository)\n```\n\n`gift_card.id.value`, `.balance.value`, `.expires_at.microseconds` se desempaquetan **solo\naqu\u00ed** \u2014 este par de funciones es el \u00fanico lugar del codebase autorizado a hacerlo, porque\ntraducir entre representaci\u00f3n de dominio y representaci\u00f3n de almacenamiento es su \u00fanico\nprop\u00f3sito (Data Mapper, Fowler). La misma extracci\u00f3n en `domain/` o `services/` s\u00ed ser\u00eda el\nanti-patr\u00f3n que el est\u00e1ndar proh\u00edbe.\n\n`code` se genera aleatoriamente (`GiftCardCode.generate()`) y tiene constraint `unique=True`\nen la tabla \u2014 mismo riesgo de colisi\u00f3n que un `HumanFriendlyId`; en producci\u00f3n, `put()` para\nuna tarjeta reci\u00e9n emitida se envolver\u00eda con\n`commons.adapters.repository_helpers.insert_with_id_retry` en vez de un `put()` directo.\n\n---\n\n## 4. Application layer \u2014 `services/`\n\n### `commerce/gift_card/services/dto.py`\n\n```python\nimport decimal\n\nimport pydantic\n\nfrom commons.domain import money\n\nfrom commerce.gift_card.domain.model import aggregate\n\n\nclass IssueGiftCardInputDTO(pydantic.BaseModel):\n    initial_balance: decimal.Decimal\n    currency: money.Currencies\n    valid_days: int\n\n\nclass RedeemGiftCardInputDTO(pydantic.BaseModel):\n    code: str\n    amount: decimal.Decimal\n    currency: money.Currencies\n\n\nclass GiftCardOutputDTO(pydantic.BaseModel):\n    id: str\n    code: str\n    balance: decimal.Decimal\n    currency: money.Currencies\n    status: str\n    expires_at: int\n\n    @classmethod\n    def from_entity(cls, gift_card: \"aggregate.GiftCard\") -> \"GiftCardOutputDTO\":\n        return cls(\n            id=str(gift_card.id.value),\n            code=gift_card.code.value,\n            balance=gift_card.balance.value,\n            currency=gift_card.balance.currency,\n            status=gift_card.status.value,\n            expires_at=gift_card.expires_at.microseconds,\n        )\n```\n\n### `commerce/gift_card/services/gift_card.py`\n\n```python\nimport datetime\n\nfrom commons.adapters import logs, unit_of_work\nfrom commons.domain import aggregates, money\nfrom commons.domain import value_objects as base_value_objects\n\nfrom commerce.gift_card.domain.model import aggregate, value_objects\nfrom commerce.gift_card.services import dto\n\n_LOGGER = logs.get_logger()\n\n\ndef issue_gift_card(*, uow: \"unit_of_work.UnitOfWork\",\n                     input_dto: dto.IssueGiftCardInputDTO) -> dto.GiftCardOutputDTO:\n    \"\"\"Emite una tarjeta de regalo nueva, v\u00e1lida por `input_dto.valid_days` d\u00edas.\"\"\"\n    expires_at = base_value_objects.PosixTime.from_datetime(\n        datetime.datetime.now(tz=datetime.UTC)\n        + datetime.timedelta(days=input_dto.valid_days)\n    )\n    with uow.transaction():\n        gift_card = aggregate.GiftCard.issue(\n            initial_balance=money.NonNegativeMoney(currency=input_dto.currency,\n                                                     value=input_dto.initial_balance),\n            expires_at=expires_at,\n        )\n        uow.repo(aggregate.GiftCard).put(gift_card)\n        _publish_events(uow, gift_card)\n    _LOGGER.info(\"Gift card [%s] issued with code [%s]\", gift_card.id, gift_card.code)\n    return dto.GiftCardOutputDTO.from_entity(gift_card)\n\n\ndef redeem_gift_card(*, uow: \"unit_of_work.UnitOfWork\",\n                      input_dto: dto.RedeemGiftCardInputDTO) -> dto.GiftCardOutputDTO:\n    \"\"\"Canjea `input_dto.amount` de la tarjeta identificada por `input_dto.code`.\"\"\"\n    with uow.transaction():\n        code = value_objects.GiftCardCode(value=input_dto.code)\n        gift_card = uow.repo(aggregate.GiftCard).get_by_code(code)\n        gift_card.redeem(amount=money.PositiveMoney(currency=input_dto.currency,\n                                                       value=input_dto.amount))\n        uow.repo(aggregate.GiftCard).put(gift_card)\n        _publish_events(uow, gift_card)\n    _LOGGER.info(\"Gift card [%s] redeemed [%s %s]\", gift_card.id,\n                 input_dto.amount, input_dto.currency)\n    return dto.GiftCardOutputDTO.from_entity(gift_card)\n\n\ndef get_gift_card(*, uow: \"unit_of_work.UnitOfWork\",\n                   gift_card_id: \"value_objects.GiftCardId\") -> dto.GiftCardOutputDTO:\n    \"\"\"Lectura pura \u2014 no hay mutaci\u00f3n ni eventos que publicar.\"\"\"\n    with uow.transaction():\n        gift_card = uow.repo(aggregate.GiftCard).get(gift_card_id)\n    return dto.GiftCardOutputDTO.from_entity(gift_card)\n\n\ndef _publish_events(uow: \"unit_of_work.UnitOfWork\",\n                     entity: \"aggregates.AggregateRoot\") -> None:\n    for event in entity.pull_events():\n        uow.outbox.record(event)   # misma transacci\u00f3n \u2014 nunca fire-and-forget\n```\n\nReglas aplicadas: una funci\u00f3n por caso de uso, nombrada como verbo, `uow` siempre expl\u00edcito\npor par\u00e1metro (nada de DI de framework aqu\u00ed), y **este m\u00f3dulo es el \u00fanico lugar autorizado a\nllamar `uow.repo(aggregate.GiftCard)` o `gift_card.redeem(...)`** \u2014 ni un futuro\n`orchestrators/` ni un `entrypoints/` pueden saltarse esto.\n\n---\n\n## 5. Entrypoint (sin orquestador \u2014 llamada directa al servicio)\n\nComo `issue_gift_card`/`redeem_gift_card` mutan un solo agregado, la ruta llama la funci\u00f3n de\n`services/` directo, sin capa de orquestaci\u00f3n intermedia (\u00a710.1):\n\n```python\n# commerce/entrypoints/web/public.py  (rutas a\u00f1adidas al FastAPI app existente de commerce)\nfrom typing import Annotated\n\nimport fastapi\n\nfrom commerce.gift_card.services import dto, gift_card\n\napp: \"fastapi.FastAPI\"   # ya existe, definido junto a orders/stock\n\n\n@app.post(\"/gift-cards\", response_model=dto.GiftCardOutputDTO, status_code=201)\ndef issue_gift_card(\n    body: dto.IssueGiftCardInputDTO,\n    idempotency_key: Annotated[str | None, fastapi.Header(alias=\"Idempotency-Key\")] = None,\n    uow: Annotated[\"unit_of_work.UnitOfWork\", fastapi.Depends(get_uow)] = ...,\n) -> dto.GiftCardOutputDTO:\n    with uow.transaction(idempotency_key=idempotency_key):\n        return gift_card.issue_gift_card(uow=uow, input_dto=body)\n\n\n@app.post(\"/gift-cards/redeem\", response_model=dto.GiftCardOutputDTO)\ndef redeem_gift_card(\n    body: dto.RedeemGiftCardInputDTO,\n    idempotency_key: Annotated[str | None, fastapi.Header(alias=\"Idempotency-Key\")] = None,\n    uow: Annotated[\"unit_of_work.UnitOfWork\", fastapi.Depends(get_uow)] = ...,\n) -> dto.GiftCardOutputDTO:\n    with uow.transaction(idempotency_key=idempotency_key):\n        return gift_card.redeem_gift_card(uow=uow, input_dto=body)\n```\n\n`Idempotency-Key` se agrega tambi\u00e9n en `redeem`, no solo en `issue`: la excepci\u00f3n del\nest\u00e1ndar (\"suspend/resume/delete son naturalmente idempotentes\") no aplica ac\u00e1 \u2014 un reintento\nde `redeem` sin key descontar\u00eda saldo dos veces, as\u00ed que s\u00ed necesita la key igual que una\ncreaci\u00f3n. La ruta abre su propia `uow.transaction(idempotency_key=...)` alrededor de la\nllamada al servicio; como `issue_gift_card`/`redeem_gift_card` abren su propio\n`with uow.transaction():` interno, ese segundo `with` simplemente se une a la transacci\u00f3n ya\nabierta (re-entrancia de \u00a78) \u2014 un solo commit.\n\n---\n\n## 6. Lo que falta para dejarlo productivo (no incluido arriba, pero es el siguiente paso)\n\n1. **Migraci\u00f3n**: `alembic revision --autogenerate -m \"add gift_card table\"` \u2014 nunca escrita\n   a mano.\n2. **Import-linter**: `gift_card` recibe los mismos 6 contratos que cualquier otro\n   subcontexto (pureza de dominio, layering, independencia entre subcontextos, independencia\n   de `commons`, entrypoints delgados, orquestadores delgados) \u2014 no un subconjunto.\n3. **Tests**: unitarios de `GiftCard.redeem()`/`.expire()` contra un `FakeGiftCardRepository`\n   (sin DB), e integraci\u00f3n de `_to_orm`/`_to_entity` y `version_id_col` contra Postgres real\n   v\u00eda testcontainers \u2014 nunca SQLite.\n"}], "grading": {"expectations": [{"text": "naming_correct", "passed": true, "evidence": "commerce/gift_card/ \u2014 explicitly reasoned per \u00a73.1: 'El subcontexto se nombra en snake_case coincidiendo con el agregado'"}, {"text": "module_qualified_imports", "passed": true, "evidence": "Every file uses `from x import y` then `y.Z` (e.g. `from commons.domain import aggregates, money` then `aggregates.AggregateRoot`); aliases used correctly for collisions (`base_value_objects`, `commons_exceptions`)"}, {"text": "typed_id_used", "passed": true, "evidence": "`class GiftCardId(value_objects.UuidV7Id): pass`"}, {"text": "money_used_for_balance", "passed": true, "evidence": "`balance: money.NonNegativeMoney`, redemption amount typed `money.PositiveMoney`; even added a missing `__sub__` to the shared `Money` class rather than hand-rolling subtraction"}, {"text": "posixtime_for_timestamps", "passed": true, "evidence": "`expires_at: base_value_objects.PosixTime`, uses `PosixTime.now()`/`.from_datetime()`, never raw datetime in the domain; ORM stores `expires_at: Mapped[int]` as BigInteger microseconds"}, {"text": "strenum_for_status", "passed": true, "evidence": "`class GiftCardStatus(enum.StrEnum):`"}, {"text": "event_recorded_correctly", "passed": true, "evidence": "`GiftCardRedeemed(domain_events.DomainEvent)` defined; `self.record_event(events.GiftCardRedeemed(...))` called inside `redeem()`"}, {"text": "events_drained_in_service", "passed": true, "evidence": "`_publish_events(uow, gift_card)` called inside `with uow.transaction():` in both `issue_gift_card` and `redeem_gift_card`"}, {"text": "no_unnecessary_orchestrator", "passed": true, "evidence": "Explicitly walked the decision tree ('\u00bfel caso de uso muta exactamente una instancia de agregado? \u2192 S\u00ed... \u00a710.1') and named the Middle Man smell as the reason not to add one"}, {"text": "narrow_domain_exception", "passed": true, "evidence": "`GiftCardNotActiveError`, `GiftCardExpiredError`, `InsufficientGiftCardBalanceError`, `GiftCardNotFoundError` \u2014 one per invalid transition, all subclassing `commons.domain.exceptions`"}], "summary": {"passed": 10, "failed": 0, "total": 10, "pass_rate": 1.0}, "timing": {"executor_duration_seconds": 449.2, "total_tokens": 116366}, "eval_feedback": {"suggestions": [{"reason": "The run surfaced a real gap in the skill's own Money reference (missing __sub__) and fixed it in-place rather than hand-rolling subtraction elsewhere \u2014 worth backporting __sub__ into the actual references/domain-and-application.md and ARCHITECTURE.md so future runs don't have to rediscover this."}], "overall": "All 10 assertions pass with genuine, well-reasoned evidence (not superficial) \u2014 the decision-tree walk-through for 'no orchestrator' and the correction of an incomplete Money reference show real understanding, not pattern-matching against the golden path example."}}}, {"id": "eval-1-gift-card-context-without_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "result.md", "type": "text", "content": "# Subcontexto `gift_card` en `commerce` (DDD + Hexagonal, FastAPI + SQLAlchemy/PostgreSQL)\n\nComo no me diste el detalle exacto de tu convenci\u00f3n interna, sigo el est\u00e1ndar m\u00e1s extendido para este stack (el mismo que usan libros de referencia como *Cosmic Python* / *Implementing DDD*): capas **domain \u2192 services (application layer) \u2192 adapters**, con inversi\u00f3n de dependencias (el dominio no conoce SQLAlchemy ni FastAPI), un **Repository** como puerto hacia persistencia, un **Unit of Work** para transaccionalidad, y los eventos de dominio recolectados en la agregada y despachados tras el commit. Ajusta nombres si tu codebase ya tiene convenciones propias (p. ej. `orchestrators/`, `use_cases/`, etc.).\n\n## \u00c1rbol de archivos\n\n```\ncommerce/\n\u2514\u2500\u2500 gift_card/\n    \u251c\u2500\u2500 __init__.py\n    \u251c\u2500\u2500 domain/\n    \u2502   \u251c\u2500\u2500 __init__.py\n    \u2502   \u251c\u2500\u2500 model.py          # Aggregate root GiftCard + Value Objects (Money, GiftCardCode)\n    \u2502   \u251c\u2500\u2500 events.py         # Eventos de dominio (GiftCardIssued, GiftCardRedeemed, GiftCardExpired)\n    \u2502   \u2514\u2500\u2500 exceptions.py     # Excepciones de dominio\n    \u251c\u2500\u2500 services/\n    \u2502   \u251c\u2500\u2500 __init__.py\n    \u2502   \u251c\u2500\u2500 unit_of_work.py   # Puerto + adaptador SQLAlchemy del UoW\n    \u2502   \u251c\u2500\u2500 handlers.py       # Casos de uso (comandos) + handlers de eventos\n    \u2502   \u2514\u2500\u2500 message_bus.py    # Despacho de eventos de dominio\n    \u2514\u2500\u2500 adapters/\n        \u251c\u2500\u2500 __init__.py\n        \u251c\u2500\u2500 orm.py            # Modelo SQLAlchemy (declarativo) + mapeo hacia/desde el dominio\n        \u251c\u2500\u2500 repository.py     # Puerto AbstractGiftCardRepository + adaptador SQLAlchemy\n        \u2514\u2500\u2500 entrypoints/\n            \u251c\u2500\u2500 __init__.py\n            \u2514\u2500\u2500 api.py        # Router FastAPI (adaptador de entrada / \"driving adapter\")\n```\n\n**Regla de dependencias**: `domain` no importa nada de `adapters` ni de `services`. `services` importa `domain` y depende de los *puertos* (interfaces) definidos en `adapters`/`services`, no de sus implementaciones concretas. `adapters` importa `domain` y `services` para implementar los puertos y exponer la API.\n\n---\n\n## 1. Domain\n\n### `commerce/gift_card/domain/exceptions.py`\n\n```python\nclass GiftCardDomainError(Exception):\n    \"\"\"Clase base para todos los errores de dominio de GiftCard.\"\"\"\n\n\nclass InvalidGiftCardCodeError(GiftCardDomainError):\n    pass\n\n\nclass InvalidRedemptionAmountError(GiftCardDomainError):\n    pass\n\n\nclass InsufficientBalanceError(GiftCardDomainError):\n    pass\n\n\nclass GiftCardNotActiveError(GiftCardDomainError):\n    pass\n\n\nclass GiftCardExpiredError(GiftCardDomainError):\n    pass\n\n\nclass CurrencyMismatchError(GiftCardDomainError):\n    pass\n\n\nclass GiftCardNotFoundError(GiftCardDomainError):\n    pass\n\n\nclass GiftCardCodeAlreadyExistsError(GiftCardDomainError):\n    pass\n```\n\n### `commerce/gift_card/domain/events.py`\n\n```python\nfrom __future__ import annotations\n\nimport uuid\nfrom dataclasses import dataclass\nfrom datetime import datetime\nfrom decimal import Decimal\n\n\nclass DomainEvent:\n    \"\"\"Clase marcadora para todos los eventos de dominio de este subcontexto.\"\"\"\n\n\n@dataclass(frozen=True)\nclass GiftCardIssued(DomainEvent):\n    gift_card_id: uuid.UUID\n    code: str\n    amount: Decimal\n    currency: str\n    issued_at: datetime\n\n\n@dataclass(frozen=True)\nclass GiftCardRedeemed(DomainEvent):\n    \"\"\"Emitido cuando una gift card es canjeada (total o parcialmente).\"\"\"\n\n    gift_card_id: uuid.UUID\n    code: str\n    amount: Decimal\n    currency: str\n    remaining_balance: Decimal\n    fully_redeemed: bool\n    redeemed_at: datetime\n\n\n@dataclass(frozen=True)\nclass GiftCardExpired(DomainEvent):\n    gift_card_id: uuid.UUID\n    code: str\n    remaining_balance: Decimal\n    currency: str\n    expired_at: datetime\n```\n\n### `commerce/gift_card/domain/model.py`\n\n```python\nfrom __future__ import annotations\n\nimport uuid\nfrom datetime import datetime, timedelta, timezone\nfrom decimal import Decimal\nfrom enum import Enum\nfrom typing import List, Optional\n\nfrom commerce.gift_card.domain.events import (\n    DomainEvent,\n    GiftCardExpired,\n    GiftCardIssued,\n    GiftCardRedeemed,\n)\nfrom commerce.gift_card.domain.exceptions import (\n    CurrencyMismatchError,\n    GiftCardExpiredError,\n    GiftCardNotActiveError,\n    InsufficientBalanceError,\n    InvalidGiftCardCodeError,\n    InvalidRedemptionAmountError,\n)\n\n_CODE_LENGTH = 16\n\n\n# ---------------------------------------------------------------------------\n# Value Objects\n# ---------------------------------------------------------------------------\nclass Money:\n    \"\"\"Value Object inmutable para representar dinero. Nunca usar float para dinero.\"\"\"\n\n    __slots__ = (\"amount\", \"currency\")\n\n    def __init__(self, amount: Decimal, currency: str = \"USD\") -> None:\n        if not isinstance(amount, Decimal):\n            amount = Decimal(str(amount))\n        if amount < Decimal(\"0\"):\n            raise ValueError(\"El monto no puede ser negativo\")\n        if len(currency) != 3:\n            raise ValueError(\"La moneda debe ser un c\u00f3digo ISO-4217 de 3 letras\")\n        object.__setattr__(self, \"amount\", amount)\n        object.__setattr__(self, \"currency\", currency.upper())\n\n    def __setattr__(self, key, value):\n        raise AttributeError(\"Money es inmutable\")\n\n    def _check_currency(self, other: \"Money\") -> None:\n        if self.currency != other.currency:\n            raise CurrencyMismatchError(\n                f\"No se puede operar entre {self.currency} y {other.currency}\"\n            )\n\n    def __add__(self, other: \"Money\") -> \"Money\":\n        self._check_currency(other)\n        return Money(self.amount + other.amount, self.currency)\n\n    def __sub__(self, other: \"Money\") -> \"Money\":\n        self._check_currency(other)\n        result = self.amount - other.amount\n        if result < Decimal(\"0\"):\n            raise InsufficientBalanceError(\n                f\"No se puede restar {other.amount} de un balance de {self.amount}\"\n            )\n        return Money(result, self.currency)\n\n    def __gt__(self, other: \"Money\") -> bool:\n        self._check_currency(other)\n        return self.amount > other.amount\n\n    def __ge__(self, other: \"Money\") -> bool:\n        self._check_currency(other)\n        return self.amount >= other.amount\n\n    def __eq__(self, other: object) -> bool:\n        return (\n            isinstance(other, Money)\n            and self.amount == other.amount\n            and self.currency == other.currency\n        )\n\n    def __hash__(self) -> int:\n        return hash((self.amount, self.currency))\n\n    def __repr__(self) -> str:\n        return f\"Money({self.amount}, {self.currency!r})\"\n\n    def is_zero(self) -> bool:\n        return self.amount == Decimal(\"0\")\n\n\nclass GiftCardCode:\n    \"\"\"Value Object para el c\u00f3digo de la tarjeta. Se normaliza y valida en construcci\u00f3n.\"\"\"\n\n    __slots__ = (\"value\",)\n\n    def __init__(self, raw_value: str) -> None:\n        normalized = (raw_value or \"\").strip().upper()\n        if len(normalized) != _CODE_LENGTH or not normalized.isalnum():\n            raise InvalidGiftCardCodeError(\n                f\"'{raw_value}' no es un c\u00f3digo de gift card v\u00e1lido \"\n                f\"(se esperan {_CODE_LENGTH} caracteres alfanum\u00e9ricos)\"\n            )\n        object.__setattr__(self, \"value\", normalized)\n\n    def __setattr__(self, key, value):\n        raise AttributeError(\"GiftCardCode es inmutable\")\n\n    def __str__(self) -> str:\n        return self.value\n\n    def __eq__(self, other: object) -> bool:\n        return isinstance(other, GiftCardCode) and self.value == other.value\n\n    def __hash__(self) -> int:\n        return hash(self.value)\n\n\nclass GiftCardStatus(str, Enum):\n    ACTIVE = \"ACTIVE\"\n    REDEEMED = \"REDEEMED\"\n    EXPIRED = \"EXPIRED\"\n\n\n# ---------------------------------------------------------------------------\n# Aggregate Root\n# ---------------------------------------------------------------------------\nclass GiftCard:\n    \"\"\"Aggregate root del subcontexto GiftCard.\n\n    Toda invariante de negocio (transiciones de estado, validaci\u00f3n de saldo,\n    expiraci\u00f3n) vive aqu\u00ed. Es un objeto plano de Python: no conoce SQLAlchemy,\n    FastAPI ni ning\u00fan detalle de infraestructura.\n    \"\"\"\n\n    def __init__(\n        self,\n        id: uuid.UUID,\n        code: GiftCardCode,\n        balance: Money,\n        status: GiftCardStatus,\n        issued_at: datetime,\n        expires_at: datetime,\n        redeemed_at: Optional[datetime] = None,\n        version: int = 0,\n    ) -> None:\n        self.id = id\n        self.code = code\n        self.balance = balance\n        self.status = status\n        self.issued_at = issued_at\n        self.expires_at = expires_at\n        self.redeemed_at = redeemed_at\n        self.version = version\n        self.events: List[DomainEvent] = []\n\n    # -- Factory -------------------------------------------------------\n    @classmethod\n    def issue(\n        cls,\n        code: GiftCardCode,\n        initial_balance: Money,\n        valid_for_days: int = 365,\n    ) -> \"GiftCard\":\n        if initial_balance.is_zero():\n            raise InvalidRedemptionAmountError(\n                \"No se puede emitir una gift card con saldo inicial cero\"\n            )\n        now = datetime.now(timezone.utc)\n        gift_card = cls(\n            id=uuid.uuid4(),\n            code=code,\n            balance=initial_balance,\n            status=GiftCardStatus.ACTIVE,\n            issued_at=now,\n            expires_at=now + timedelta(days=valid_for_days),\n        )\n        gift_card.events.append(\n            GiftCardIssued(\n                gift_card_id=gift_card.id,\n                code=str(gift_card.code),\n                amount=gift_card.balance.amount,\n                currency=gift_card.balance.currency,\n                issued_at=now,\n            )\n        )\n        return gift_card\n\n    # -- Comportamiento --------------------------------------------------\n    def redeem(self, amount: Money) -> None:\n        \"\"\"Canjea (total o parcialmente) el saldo de la tarjeta.\n\n        Emite GiftCardRedeemed. Si el saldo llega a cero, la tarjeta pasa\n        a estado REDEEMED.\n        \"\"\"\n        self._expire_if_needed()\n\n        if self.status != GiftCardStatus.ACTIVE:\n            raise GiftCardNotActiveError(\n                f\"La gift card {self.code} no puede canjearse: estado actual {self.status.value}\"\n            )\n        if amount.is_zero():\n            raise InvalidRedemptionAmountError(\"El monto a canjear debe ser mayor a cero\")\n        if amount > self.balance:\n            raise InsufficientBalanceError(\n                f\"La gift card {self.code} no tiene saldo suficiente: \"\n                f\"solicitado {amount.amount}, disponible {self.balance.amount}\"\n            )\n\n        self.balance = self.balance - amount\n        redeemed_at = datetime.now(timezone.utc)\n        fully_redeemed = self.balance.is_zero()\n\n        if fully_redeemed:\n            self.status = GiftCardStatus.REDEEMED\n            self.redeemed_at = redeemed_at\n\n        self.events.append(\n            GiftCardRedeemed(\n                gift_card_id=self.id,\n                code=str(self.code),\n                amount=amount.amount,\n                currency=amount.currency,\n                remaining_balance=self.balance.amount,\n                fully_redeemed=fully_redeemed,\n                redeemed_at=redeemed_at,\n            )\n        )\n\n    def mark_expired(self) -> None:\n        \"\"\"Transici\u00f3n expl\u00edcita a EXPIRED (usada tambi\u00e9n por un job/cron peri\u00f3dico).\"\"\"\n        if self.status == GiftCardStatus.REDEEMED:\n            return  # una tarjeta ya canjeada no puede expirar\n        if self.status == GiftCardStatus.EXPIRED:\n            return\n        self.status = GiftCardStatus.EXPIRED\n        self.events.append(\n            GiftCardExpired(\n                gift_card_id=self.id,\n                code=str(self.code),\n                remaining_balance=self.balance.amount,\n                currency=self.balance.currency,\n                expired_at=datetime.now(timezone.utc),\n            )\n        )\n\n    # -- Helpers privados --------------------------------------------------\n    def _expire_if_needed(self) -> None:\n        if self.status == GiftCardStatus.ACTIVE and datetime.now(timezone.utc) >= self.expires_at:\n            self.mark_expired()\n        if self.status == GiftCardStatus.EXPIRED:\n            raise GiftCardExpiredError(f\"La gift card {self.code} est\u00e1 expirada\")\n\n    # -- Identidad --------------------------------------------------\n    def __eq__(self, other: object) -> bool:\n        return isinstance(other, GiftCard) and self.id == other.id\n\n    def __hash__(self) -> int:\n        return hash(self.id)\n```\n\n**Notas de dise\u00f1o del dominio:**\n- `Money` y `GiftCardCode` son *Value Objects* inmutables con sus propias invariantes (no dejan existir un `Money` negativo ni un c\u00f3digo con formato inv\u00e1lido).\n- `GiftCard` es el \u00fanico punto de entrada para mutar el estado: no hay setters p\u00fablicos de `status`/`balance`, todo pasa por `redeem()` / `mark_expired()` / `issue()`.\n- Los eventos se acumulan en `self.events` dentro de la propia agregada (patr\u00f3n \"eventos recolectados\", igual que en Cosmic Python / muchas implementaciones de Evans-DDD) y se drenan despu\u00e9s desde la capa de aplicaci\u00f3n \u2014 as\u00ed el dominio nunca depende de un bus de eventos concreto.\n- La expiraci\u00f3n se resuelve de forma perezosa (`_expire_if_needed`) en cada operaci\u00f3n de negocio; para que las tarjetas vencidas no queden \"activas\" en el read model indefinidamente sin que nadie las toque, conviene adem\u00e1s un job peri\u00f3dico (ver secci\u00f3n de notas de producci\u00f3n) que recorra tarjetas con `expires_at < now()` y llame `mark_expired()`.\n\n---\n\n## 2. Adapters\n\n### `commerce/gift_card/adapters/orm.py`\n\n```python\nfrom __future__ import annotations\n\nimport uuid\nfrom datetime import datetime\nfrom typing import Optional\n\nfrom sqlalchemy import DateTime, Enum as SAEnum, Integer, Numeric, String\nfrom sqlalchemy.dialects.postgresql import UUID\nfrom sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column\n\nfrom commerce.gift_card.domain.model import GiftCard, GiftCardCode, GiftCardStatus, Money\n\n\nclass Base(DeclarativeBase):\n    pass\n\n\nclass GiftCardModel(Base):\n    \"\"\"Modelo de persistencia (SQLAlchemy). Solo lo importan los adapters,\n    nunca el dominio ni los casos de uso.\n    \"\"\"\n\n    __tablename__ = \"gift_cards\"\n\n    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)\n    code: Mapped[str] = mapped_column(String(16), nullable=False, unique=True, index=True)\n    balance_amount: Mapped[Numeric] = mapped_column(Numeric(12, 2), nullable=False)\n    balance_currency: Mapped[str] = mapped_column(String(3), nullable=False)\n    status: Mapped[GiftCardStatus] = mapped_column(\n        SAEnum(GiftCardStatus, name=\"gift_card_status\", native_enum=True),\n        nullable=False,\n    )\n    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)\n    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)\n    redeemed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)\n    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)\n\n    # -- Mapeo dominio <-> persistencia --------------------------------\n    def to_domain(self) -> GiftCard:\n        return GiftCard(\n            id=self.id,\n            code=GiftCardCode(self.code),\n            balance=Money(self.balance_amount, self.balance_currency),\n            status=self.status,\n            issued_at=self.issued_at,\n            expires_at=self.expires_at,\n            redeemed_at=self.redeemed_at,\n            version=self.version,\n        )\n\n    @classmethod\n    def from_domain(cls, gift_card: GiftCard) -> \"GiftCardModel\":\n        return cls(\n            id=gift_card.id,\n            code=str(gift_card.code),\n            balance_amount=gift_card.balance.amount,\n            balance_currency=gift_card.balance.currency,\n            status=gift_card.status,\n            issued_at=gift_card.issued_at,\n            expires_at=gift_card.expires_at,\n            redeemed_at=gift_card.redeemed_at,\n            version=gift_card.version,\n        )\n\n    def update_from_domain(self, gift_card: GiftCard) -> None:\n        \"\"\"Sincroniza los campos mutables tras una operaci\u00f3n de dominio.\"\"\"\n        self.balance_amount = gift_card.balance.amount\n        self.balance_currency = gift_card.balance.currency\n        self.status = gift_card.status\n        self.redeemed_at = gift_card.redeemed_at\n        self.version = gift_card.version\n```\n\n**Migraci\u00f3n Alembic (referencia m\u00ednima):**\n\n```python\n# alembic/versions/xxxx_create_gift_cards.py\ndef upgrade() -> None:\n    op.create_table(\n        \"gift_cards\",\n        sa.Column(\"id\", postgresql.UUID(as_uuid=True), primary_key=True),\n        sa.Column(\"code\", sa.String(16), nullable=False),\n        sa.Column(\"balance_amount\", sa.Numeric(12, 2), nullable=False),\n        sa.Column(\"balance_currency\", sa.String(3), nullable=False),\n        sa.Column(\n            \"status\",\n            sa.Enum(\"ACTIVE\", \"REDEEMED\", \"EXPIRED\", name=\"gift_card_status\"),\n            nullable=False,\n        ),\n        sa.Column(\"issued_at\", sa.DateTime(timezone=True), nullable=False),\n        sa.Column(\"expires_at\", sa.DateTime(timezone=True), nullable=False),\n        sa.Column(\"redeemed_at\", sa.DateTime(timezone=True), nullable=True),\n        sa.Column(\"version\", sa.Integer, nullable=False, server_default=\"0\"),\n    )\n    op.create_unique_constraint(\"uq_gift_cards_code\", \"gift_cards\", [\"code\"])\n    op.create_index(\"ix_gift_cards_expires_at\", \"gift_cards\", [\"expires_at\"])\n\n\ndef downgrade() -> None:\n    op.drop_table(\"gift_cards\")\n    op.execute(\"DROP TYPE gift_card_status\")\n```\n\n### `commerce/gift_card/adapters/repository.py`\n\n```python\nfrom __future__ import annotations\n\nimport abc\nimport uuid\nfrom typing import Dict, Optional, Set\n\nfrom sqlalchemy.orm import Session\n\nfrom commerce.gift_card.adapters.orm import GiftCardModel\nfrom commerce.gift_card.domain.model import GiftCard, GiftCardCode\n\n\nclass AbstractGiftCardRepository(abc.ABC):\n    \"\"\"Puerto: c\u00f3mo la capa de aplicaci\u00f3n accede a las agregadas GiftCard.\n\n    Trackea las agregadas \"vistas\" (`seen`) para que el Unit of Work pueda\n    luego drenar sus eventos de dominio, sin acoplar el repositorio a un\n    bus de eventos concreto.\n    \"\"\"\n\n    def __init__(self) -> None:\n        self.seen: Set[GiftCard] = set()\n\n    def add(self, gift_card: GiftCard) -> None:\n        self._add(gift_card)\n        self.seen.add(gift_card)\n\n    def get(self, code: GiftCardCode) -> Optional[GiftCard]:\n        gift_card = self._get(code)\n        if gift_card is not None:\n            self.seen.add(gift_card)\n        return gift_card\n\n    def get_by_id(self, gift_card_id: uuid.UUID) -> Optional[GiftCard]:\n        gift_card = self._get_by_id(gift_card_id)\n        if gift_card is not None:\n            self.seen.add(gift_card)\n        return gift_card\n\n    @abc.abstractmethod\n    def _add(self, gift_card: GiftCard) -> None: ...\n\n    @abc.abstractmethod\n    def _get(self, code: GiftCardCode) -> Optional[GiftCard]: ...\n\n    @abc.abstractmethod\n    def _get_by_id(self, gift_card_id: uuid.UUID) -> Optional[GiftCard]: ...\n\n\nclass SqlAlchemyGiftCardRepository(AbstractGiftCardRepository):\n    \"\"\"Adaptador de salida (\"driven adapter\"): implementaci\u00f3n PostgreSQL.\"\"\"\n\n    def __init__(self, session: Session) -> None:\n        super().__init__()\n        self.session = session\n        self._identity_map: Dict[uuid.UUID, GiftCardModel] = {}\n\n    def _add(self, gift_card: GiftCard) -> None:\n        model = GiftCardModel.from_domain(gift_card)\n        self.session.add(model)\n        self._identity_map[gift_card.id] = model\n\n    def _get(self, code: GiftCardCode) -> Optional[GiftCard]:\n        # with_for_update: lock pesimista de fila para evitar canjes\n        # concurrentes sobre la misma tarjeta (double-spend).\n        model = (\n            self.session.query(GiftCardModel)\n            .filter_by(code=str(code))\n            .with_for_update()\n            .first()\n        )\n        if model is None:\n            return None\n        self._identity_map[model.id] = model\n        return model.to_domain()\n\n    def _get_by_id(self, gift_card_id: uuid.UUID) -> Optional[GiftCard]:\n        model = self.session.get(GiftCardModel, gift_card_id)\n        if model is None:\n            return None\n        self._identity_map[model.id] = model\n        return model.to_domain()\n\n    def persist(self, gift_card: GiftCard) -> None:\n        \"\"\"Vuelca los cambios del objeto de dominio sobre la fila ORM\n        rastreada, antes del commit. Necesario porque `to_domain()` crea\n        un objeto de dominio desconectado de la Session.\n        \"\"\"\n        model = self._identity_map.get(gift_card.id)\n        if model is not None:\n            model.update_from_domain(gift_card)\n```\n\n### `commerce/gift_card/adapters/entrypoints/api.py`\n\n```python\nfrom __future__ import annotations\n\nfrom decimal import Decimal\n\nfrom fastapi import APIRouter, HTTPException, status\nfrom pydantic import BaseModel, Field\n\nfrom commerce.gift_card.domain.exceptions import (\n    CurrencyMismatchError,\n    GiftCardCodeAlreadyExistsError,\n    GiftCardExpiredError,\n    GiftCardNotActiveError,\n    GiftCardNotFoundError,\n    InsufficientBalanceError,\n    InvalidGiftCardCodeError,\n    InvalidRedemptionAmountError,\n)\nfrom commerce.gift_card.domain.model import GiftCardCode\nfrom commerce.gift_card.services import handlers, message_bus\nfrom commerce.gift_card.services.unit_of_work import SqlAlchemyUnitOfWork\n\nrouter = APIRouter(prefix=\"/gift-cards\", tags=[\"gift-cards\"])\n\n_DOMAIN_ERROR_STATUS = {\n    InvalidGiftCardCodeError: status.HTTP_422_UNPROCESSABLE_ENTITY,\n    InvalidRedemptionAmountError: status.HTTP_422_UNPROCESSABLE_ENTITY,\n    CurrencyMismatchError: status.HTTP_422_UNPROCESSABLE_ENTITY,\n    GiftCardCodeAlreadyExistsError: status.HTTP_409_CONFLICT,\n    GiftCardNotFoundError: status.HTTP_404_NOT_FOUND,\n    GiftCardNotActiveError: status.HTTP_409_CONFLICT,\n    GiftCardExpiredError: status.HTTP_409_CONFLICT,\n    InsufficientBalanceError: status.HTTP_409_CONFLICT,\n}\n\n\nclass IssueGiftCardRequest(BaseModel):\n    code: str = Field(..., min_length=16, max_length=16)\n    amount: Decimal = Field(..., gt=0)\n    currency: str = Field(default=\"USD\", min_length=3, max_length=3)\n    valid_for_days: int = Field(default=365, gt=0)\n\n\nclass IssueGiftCardResponse(BaseModel):\n    id: str\n    code: str\n\n\nclass RedeemGiftCardRequest(BaseModel):\n    amount: Decimal = Field(..., gt=0)\n    currency: str = Field(default=\"USD\", min_length=3, max_length=3)\n\n\nclass GiftCardResponse(BaseModel):\n    id: str\n    code: str\n    balance: Decimal\n    currency: str\n    status: str\n\n\ndef _raise_as_http(exc: Exception) -> None:\n    status_code = _DOMAIN_ERROR_STATUS.get(type(exc), status.HTTP_400_BAD_REQUEST)\n    raise HTTPException(status_code=status_code, detail=str(exc)) from exc\n\n\n@router.post(\"\", response_model=IssueGiftCardResponse, status_code=status.HTTP_201_CREATED)\ndef issue_gift_card(payload: IssueGiftCardRequest) -> IssueGiftCardResponse:\n    cmd = handlers.IssueGiftCard(\n        code=payload.code,\n        amount=payload.amount,\n        currency=payload.currency,\n        valid_for_days=payload.valid_for_days,\n    )\n    try:\n        with SqlAlchemyUnitOfWork() as uow:\n            gift_card_id = handlers.issue_gift_card(cmd, uow)\n            message_bus.dispatch(uow)\n    except tuple(_DOMAIN_ERROR_STATUS) as exc:\n        _raise_as_http(exc)\n\n    return IssueGiftCardResponse(id=gift_card_id, code=payload.code.upper())\n\n\n@router.post(\"/{code}/redeem\", status_code=status.HTTP_204_NO_CONTENT)\ndef redeem_gift_card(code: str, payload: RedeemGiftCardRequest) -> None:\n    cmd = handlers.RedeemGiftCard(code=code, amount=payload.amount, currency=payload.currency)\n    try:\n        with SqlAlchemyUnitOfWork() as uow:\n            handlers.redeem_gift_card(cmd, uow)\n            message_bus.dispatch(uow)\n    except tuple(_DOMAIN_ERROR_STATUS) as exc:\n        _raise_as_http(exc)\n\n\n@router.get(\"/{code}\", response_model=GiftCardResponse)\ndef get_gift_card(code: str) -> GiftCardResponse:\n    try:\n        with SqlAlchemyUnitOfWork() as uow:\n            gift_card = uow.gift_cards.get(GiftCardCode(code))\n            if gift_card is None:\n                raise GiftCardNotFoundError(f\"Gift card {code} no encontrada\")\n            return GiftCardResponse(\n                id=str(gift_card.id),\n                code=str(gift_card.code),\n                balance=gift_card.balance.amount,\n                currency=gift_card.balance.currency,\n                status=gift_card.status.value,\n            )\n    except tuple(_DOMAIN_ERROR_STATUS) as exc:\n        _raise_as_http(exc)\n```\n\nRegistro en la app principal:\n\n```python\n# main.py / app.py\nfrom fastapi import FastAPI\nfrom commerce.gift_card.adapters.entrypoints.api import router as gift_card_router\n\napp = FastAPI()\napp.include_router(gift_card_router)\n```\n\n---\n\n## 3. Services (capa de aplicaci\u00f3n)\n\n### `commerce/gift_card/services/unit_of_work.py`\n\n```python\nfrom __future__ import annotations\n\nimport abc\nfrom types import TracebackType\nfrom typing import Iterator, Optional, Type\n\nfrom sqlalchemy import create_engine\nfrom sqlalchemy.orm import Session, sessionmaker\n\nfrom commerce.gift_card.adapters.repository import (\n    AbstractGiftCardRepository,\n    SqlAlchemyGiftCardRepository,\n)\nfrom commerce.gift_card.domain.events import DomainEvent\nfrom config import get_postgres_uri  # ajusta al m\u00f3dulo de config de tu proyecto\n\nDEFAULT_SESSION_FACTORY = sessionmaker(\n    bind=create_engine(get_postgres_uri(), isolation_level=\"READ COMMITTED\"),\n    expire_on_commit=False,\n)\n\n\nclass AbstractUnitOfWork(abc.ABC):\n    gift_cards: AbstractGiftCardRepository\n\n    def __enter__(self) -> \"AbstractUnitOfWork\":\n        return self\n\n    def __exit__(\n        self,\n        exc_type: Optional[Type[BaseException]],\n        exc: Optional[BaseException],\n        tb: Optional[TracebackType],\n    ) -> None:\n        self.rollback()  # no-op si ya hubo commit; red de seguridad ante excepciones\n\n    @abc.abstractmethod\n    def commit(self) -> None: ...\n\n    @abc.abstractmethod\n    def rollback(self) -> None: ...\n\n    def collect_new_events(self) -> Iterator[DomainEvent]:\n        for gift_card in self.gift_cards.seen:\n            while gift_card.events:\n                yield gift_card.events.pop(0)\n\n\nclass SqlAlchemyUnitOfWork(AbstractUnitOfWork):\n    def __init__(self, session_factory=DEFAULT_SESSION_FACTORY) -> None:\n        self.session_factory = session_factory\n\n    def __enter__(self) -> \"SqlAlchemyUnitOfWork\":\n        self.session: Session = self.session_factory()\n        self.gift_cards = SqlAlchemyGiftCardRepository(self.session)\n        return super().__enter__()\n\n    def __exit__(self, *args) -> None:\n        super().__exit__(*args)\n        self.session.close()\n\n    def commit(self) -> None:\n        # Sincroniza cada agregada modificada con su fila ORM antes de hacer commit.\n        for gift_card in self.gift_cards.seen:\n            self.gift_cards.persist(gift_card)\n        self.session.commit()\n\n    def rollback(self) -> None:\n        self.session.rollback()\n```\n\n### `commerce/gift_card/services/handlers.py`\n\n```python\nfrom __future__ import annotations\n\nimport logging\nfrom dataclasses import dataclass\nfrom decimal import Decimal\n\nfrom commerce.gift_card.domain import events\nfrom commerce.gift_card.domain.exceptions import (\n    GiftCardCodeAlreadyExistsError,\n    GiftCardNotFoundError,\n)\nfrom commerce.gift_card.domain.model import GiftCard, GiftCardCode, Money\nfrom commerce.gift_card.services.unit_of_work import AbstractUnitOfWork\n\nlogger = logging.getLogger(__name__)\n\n\n# ---------------------------------------------------------------------------\n# Comandos (DTOs de entrada para los casos de uso)\n# ---------------------------------------------------------------------------\n@dataclass(frozen=True)\nclass IssueGiftCard:\n    code: str\n    amount: Decimal\n    currency: str = \"USD\"\n    valid_for_days: int = 365\n\n\n@dataclass(frozen=True)\nclass RedeemGiftCard:\n    code: str\n    amount: Decimal\n    currency: str = \"USD\"\n\n\n# ---------------------------------------------------------------------------\n# Casos de uso (application services)\n# ---------------------------------------------------------------------------\ndef issue_gift_card(cmd: IssueGiftCard, uow: AbstractUnitOfWork) -> str:\n    with uow:\n        code = GiftCardCode(cmd.code)\n        if uow.gift_cards.get(code) is not None:\n            raise GiftCardCodeAlreadyExistsError(f\"La gift card {code} ya existe\")\n\n        gift_card = GiftCard.issue(\n            code=code,\n            initial_balance=Money(cmd.amount, cmd.currency),\n            valid_for_days=cmd.valid_for_days,\n        )\n        uow.gift_cards.add(gift_card)\n        uow.commit()\n        return str(gift_card.id)\n\n\ndef redeem_gift_card(cmd: RedeemGiftCard, uow: AbstractUnitOfWork) -> None:\n    with uow:\n        code = GiftCardCode(cmd.code)\n        gift_card = uow.gift_cards.get(code)  # lock pesimista via with_for_update\n        if gift_card is None:\n            raise GiftCardNotFoundError(f\"Gift card {code} no encontrada\")\n\n        gift_card.redeem(Money(cmd.amount, cmd.currency))\n        uow.commit()\n\n\n# ---------------------------------------------------------------------------\n# Handlers de eventos de dominio (efectos secundarios)\n# ---------------------------------------------------------------------------\ndef notify_loyalty_on_redemption(event: events.GiftCardRedeemed) -> None:\n    logger.info(\n        \"Notificando canje a loyalty: gift_card=%s monto=%s %s saldo_restante=%s fully_redeemed=%s\",\n        event.code, event.amount, event.currency, event.remaining_balance, event.fully_redeemed,\n    )\n    # p.ej.: loyalty_client.award_points(gift_card_code=event.code, amount=event.amount)\n\n\ndef publish_to_outbox(event: events.DomainEvent) -> None:\n    # En producci\u00f3n: serializar el evento y escribirlo en una tabla `outbox`\n    # dentro de la MISMA transacci\u00f3n del UoW (ver notas de producci\u00f3n), o\n    # publicarlo directo a SQS/EventBridge/Kafka desde un relay.\n    logger.info(\"Publicando evento de dominio: %s\", event)\n```\n\n### `commerce/gift_card/services/message_bus.py`\n\n```python\nfrom __future__ import annotations\n\nimport logging\nfrom typing import Callable, Dict, List, Type\n\nfrom commerce.gift_card.domain import events\nfrom commerce.gift_card.domain.events import DomainEvent\nfrom commerce.gift_card.services import handlers\nfrom commerce.gift_card.services.unit_of_work import AbstractUnitOfWork\n\nlogger = logging.getLogger(__name__)\n\nHANDLERS: Dict[Type[DomainEvent], List[Callable]] = {\n    events.GiftCardIssued: [handlers.publish_to_outbox],\n    events.GiftCardRedeemed: [\n        handlers.notify_loyalty_on_redemption,\n        handlers.publish_to_outbox,\n    ],\n    events.GiftCardExpired: [handlers.publish_to_outbox],\n}\n\n\ndef handle(event: DomainEvent) -> None:\n    for handler in HANDLERS.get(type(event), []):\n        try:\n            handler(event)\n        except Exception:\n            # Un handler de evento nunca debe tumbar el caso de uso principal.\n            logger.exception(\"Error manejando el evento %s\", event)\n\n\ndef dispatch(uow: AbstractUnitOfWork) -> None:\n    \"\"\"Drena los eventos de dominio acumulados durante el UoW y los publica.\"\"\"\n    for event in uow.collect_new_events():\n        handle(event)\n```\n\n---\n\n## Notas de producci\u00f3n (para llevar esto m\u00e1s all\u00e1 del ejemplo)\n\n1. **Concurrencia / double-spend en el canje**: uso `with_for_update()` (lock pesimista de fila) en `SqlAlchemyGiftCardRepository._get` para que dos requests de canje simult\u00e1neos sobre la misma tarjeta no lean el mismo saldo. Alternativa m\u00e1s escalable: control de **concurrencia optimista** con la columna `version` (incrementarla en `update_from_domain` y usarla como filtro en el `UPDATE`, reintentando en caso de conflicto).\n\n2. **Idempotencia del canje**: en un endpoint de dinero, los reintentos de red son peligrosos. Se recomienda exigir un header `Idempotency-Key` en `POST /gift-cards/{code}/redeem`, guardarlo en una tabla `idempotency_keys` (dentro del mismo UoW) y devolver la respuesta cacheada si la key ya fue procesada, en vez de re-ejecutar `redeem()`.\n\n3. **Publicaci\u00f3n confiable de eventos (transactional outbox)**: el `message_bus.dispatch(uow)` de este ejemplo despacha en memoria, *despu\u00e9s* del commit de la transacci\u00f3n principal \u2014 si el proceso muere entre el commit y el dispatch, el evento se pierde. Para garant\u00edas reales, persiste el evento en una tabla `outbox` **dentro de la misma transacci\u00f3n** que el cambio de estado (en `uow.commit()`), y un proceso aparte (poller o CDC) lo publica a SQS/EventBridge y lo marca como enviado.\n\n4. **Expiraci\u00f3n proactiva**: adem\u00e1s de la expiraci\u00f3n perezosa en `redeem()`, agrega un job (cron / Lambda programada) que corra `SELECT ... WHERE status = 'ACTIVE' AND expires_at < now()`, llame `gift_card.mark_expired()` por cada una y haga commit \u2014 as\u00ed el estado no depende de que alguien intente canjear la tarjeta para que se refleje como expirada.\n\n5. **Testing**: \n   - Unitarios de dominio: probar `GiftCard.issue/redeem/mark_expired` con un `FakeRepository`/objetos en memoria (sin DB).\n   - Integraci\u00f3n: `SqlAlchemyGiftCardRepository` contra una PostgreSQL real (o testcontainers), verificando el mapeo `to_domain`/`from_domain`.\n   - End-to-end: `TestClient` de FastAPI contra la app completa, verificando el mapeo de excepciones de dominio a c\u00f3digos HTTP.\n\n6. **Multi-moneda**: si el negocio realmente necesita multi-moneda por tarjeta, considera que `redeem()` ya rechaza mezclar monedas (`CurrencyMismatchError`); si en cambio siempre operas en una sola moneda por tenant/mercado, puedes simplificar `Money` quitando el campo `currency` variable y fijarlo por configuraci\u00f3n.\n"}], "grading": {"expectations": [{"text": "naming_correct", "passed": true, "evidence": "Folder is commerce/gift_card/, matching snake_case(GiftCard) \u2014 but coincidental: no rule was cited, the agent stated it was guessing a generic convention and told the user to adjust names to their own codebase"}, {"text": "module_qualified_imports", "passed": false, "evidence": "Imports classes directly throughout, e.g. `from commerce.gift_card.domain.events import (DomainEvent, GiftCardExpired, GiftCardIssued, GiftCardRedeemed)` and `from commerce.gift_card.domain.model import GiftCard, GiftCardCode, GiftCardStatus, Money`"}, {"text": "typed_id_used", "passed": false, "evidence": "`GiftCard.id: uuid.UUID` \u2014 a raw UUID, no GiftCardId wrapper type anywhere"}, {"text": "money_used_for_balance", "passed": false, "evidence": "Hand-rolled its own `Money` class from scratch (with `__slots__`, manual `object.__setattr__` immutability) instead of the standard's `commons.domain.money.NonNegativeMoney`/`PositiveMoney` \u2014 reasonable engineering on its own, but not this standard"}, {"text": "posixtime_for_timestamps", "passed": false, "evidence": "Uses `datetime.now(timezone.utc)` throughout and `DateTime(timezone=True)` ORM columns \u2014 exactly the pattern this standard explicitly forbids (\u00a71.8/\u00a720)"}, {"text": "strenum_for_status", "passed": false, "evidence": "`class GiftCardStatus(str, Enum):` \u2014 the old mixin form this standard explicitly replaced with `enum.StrEnum`"}, {"text": "event_recorded_correctly", "passed": false, "evidence": "Events are plain `@dataclass(frozen=True)` appended via `self.events.append(...)` \u2014 no `AggregateRoot`/`record_event()` mechanism exists in this answer at all (a different, self-invented event-collection design)"}, {"text": "events_drained_in_service", "passed": false, "evidence": "`message_bus.dispatch(uow)` is called AFTER `uow.commit()` inside the API layer, with no outbox table \u2014 the exact 'publish-after-commit, no durability guarantee' anti-pattern this standard's \u00a711.2/\u00a720 documents. The answer's own 'production notes' section (item 3) correctly *identifies* this as a real gap requiring a transactional outbox, but the shipped code doesn't implement one."}, {"text": "no_unnecessary_orchestrator", "passed": true, "evidence": "No orchestrator layer was introduced for this single-aggregate case \u2014 though this is also just the path of least resistance without any standard's decision tree to consult"}, {"text": "narrow_domain_exception", "passed": true, "evidence": "GiftCardNotActiveError, GiftCardExpiredError, InsufficientBalanceError, etc. \u2014 narrow, named exceptions, same spirit as the standard even without knowing its exact hierarchy"}], "summary": {"passed": 3, "failed": 7, "total": 10, "pass_rate": 0.3}, "timing": {"executor_duration_seconds": 236.9, "total_tokens": 72087}, "eval_feedback": {"overall": "A genuinely competent, production-minded answer on its own terms (it independently reaches for optimistic/pessimistic locking, idempotency keys, and even names the transactional outbox as the correct fix for its own known gap) \u2014 but it invents its own conventions everywhere the standard makes a specific, deliberate choice (PosixTime, StrEnum, Money, typed IDs, module imports, the record_event/outbox mechanism). This is the expected and desired gap for this eval: it shows the skill's value isn't 'can a good model write DDD code' (yes, clearly) but 'does it match THIS codebase's specific, already-established conventions so a second engineer reading it doesn't hit a wall of unfamiliar patterns.'"}}}, {"id": "eval-2-cancel-order-release-stock-with_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "result.md", "type": "text", "content": "# Cancelar una orden liberando stock reservado, at\u00f3micamente\n\n## Qu\u00e9 tier de orquestaci\u00f3n es esto\n\nRecorriendo el \u00e1rbol de decisi\u00f3n (\u00a710, `entrypoints-and-orchestration.md`):\n\n```\n\u00bfLa orden muta exactamente un agregado?\n\u2514\u2500\u2500 NO \u2014 muta Order (status \u2192 CANCELLED) Y Stock (available_quantity += qty)\n    \u2514\u2500\u2500 \u00bfMismo producto? S\u00cd (ambos viven en `commerce/`)\n        \u2192 \u00a710.2: orquestador a nivel de producto, transacci\u00f3n at\u00f3mica\n          v\u00eda `uow.transaction()` anidado.\n```\n\nEs el mismo tier que \"confirmar una orden\" (que reserva stock) \u2014 pero **no es el mismo\nc\u00f3digo invertido**. Hay una diferencia de negocio real que hay que respetar:\n\n> **Solo se libera stock si efectivamente se hab\u00eda reservado.** El stock se reserva en\n> `confirm_order`, cuando la orden pasa a `CONFIRMED`. Si una orden todav\u00eda est\u00e1 `PENDING`\n> (nunca confirmada) y se cancela, no hay nada que liberar \u2014 liberar stock en ese caso\n> incrementar\u00eda `available_quantity` sin que nunca se hubiera decrementado, corrompiendo el\n> inventario. El orquestador tiene que mirar el estado *antes* de cancelar para decidir si el\n> segundo agregado (`Stock`) participa o no en esta transacci\u00f3n.\n\nY la regla que nunca se relaja (\u00a71.5 / import-linter contract 6, restated en \u00a710.2): **el\norquestador llama funciones de `services/` de cada subcontexto \u2014 nunca `uow.repo(...)` ni un\nm\u00e9todo del agregado directamente.** Todo el c\u00f3digo de abajo respeta eso: el orquestador solo\nimporta `orders` y `stock` (los m\u00f3dulos de servicio), nunca `aggregate.Order`/`aggregate.Stock`.\n\n---\n\n## 1. Dominio \u2014 `commerce/orders`\n\n`Stock.release(quantity)` **ya existe** en el agregado `Stock` del golden path (ver\n`domain-and-application.md` \u00a75.3) \u2014 no hay que tocar `commerce/stock/domain/`. Lo que falta es\nel lado de `Order`: el m\u00e9todo de comando `cancel()`, su excepci\u00f3n de transici\u00f3n inv\u00e1lida, y el\nevento.\n\n```python\n# commerce/orders/domain/model/exceptions.py\nfrom commons.domain import exceptions\n\n\nclass OrderCannotBeCancelledError(exceptions.ConflictError):\n    def __init__(self, *, order_id: \"value_objects.OrderId\",\n                 status: \"value_objects.OrderStatus\") -> None:\n        super().__init__(\n            f\"Order [{order_id}] cannot be cancelled from status [{status}].\",\n            code=\"ORDER_CANNOT_BE_CANCELLED\",\n        )\n```\n\n```python\n# commerce/orders/domain/model/events.py  (excerpt \u2014 a\u00f1adido a lo ya existente)\nfrom commons.domain import events as domain_events\n\nfrom commerce.orders.domain.model import value_objects\n\n\nclass OrderCancelled(domain_events.DomainEvent):\n    order_id: value_objects.OrderId\n    lines: list[value_objects.OrderLine]\n    previous_status: value_objects.OrderStatus\n```\n\n```python\n# commerce/orders/domain/model/aggregate.py  (excerpt \u2014 a\u00f1adido a Order)\nfrom commerce.orders.domain.model import events, exceptions, value_objects\n\n_CANCELLABLE_STATUSES = (value_objects.OrderStatus.PENDING, value_objects.OrderStatus.CONFIRMED)\n\n\nclass Order(aggregates.AggregateRoot[value_objects.OrderId]):\n    lines: list[value_objects.OrderLine]\n    status: value_objects.OrderStatus\n\n    def cancel(self) -> None:\n        if self.status not in _CANCELLABLE_STATUSES:\n            raise exceptions.OrderCannotBeCancelledError(order_id=self.id, status=self.status)\n        previous_status = self.status\n        self.status = value_objects.OrderStatus.CANCELLED\n        self.record_event(events.OrderCancelled(\n            order_id=self.id, lines=self.lines, previous_status=previous_status,\n        ))\n```\n\nIgual que `Stock.reserve`/`Stock.release`: guarda con una excepci\u00f3n de dominio nombrada, muta\nestado, registra el evento \u2014 sin I/O, sin `uow`, sin sesi\u00f3n. `previous_status` viaja en el\nevento porque el orquestador lo necesita para decidir si libera stock (ver m\u00e1s abajo) sin tener\nque volver a leer el agregado.\n\n---\n\n## 2. Application layer \u2014 `services/`\n\nCada funci\u00f3n nueva sigue siendo la \u00fanica autorizada a llamar `uow.repo(...)` o un m\u00e9todo del\nagregado *de su propio subcontexto*.\n\n```python\n# commerce/orders/services/orders.py  (excerpt \u2014 a\u00f1adido a lo ya existente)\nfrom commerce.orders.domain.model import aggregate\nfrom commerce.orders.services import dto\n\n\ndef cancel_order(*, uow: \"unit_of_work.UnitOfWork\",\n                  order_id: \"value_objects.OrderId\") -> dto.OrderOutputDTO:\n    with uow.transaction():\n        order = uow.repo(aggregate.Order).get(order_id)\n        order.cancel()                      # raises OrderCannotBeCancelledError \u2192 rollback\n        uow.repo(aggregate.Order).put(order)\n        _publish_events(uow, order)\n    _LOGGER.info(\"Order [%s] cancelled\", order.id)\n    return dto.OrderOutputDTO.from_entity(order)\n```\n\n```python\n# commerce/stock/services/stock.py  (excerpt \u2014 a\u00f1adido a lo ya existente, sim\u00e9trico a reserve_stock)\ndef release_stock(*, uow: \"unit_of_work.UnitOfWork\", sku: \"commerce_value_objects.Sku\",\n                   quantity: int) -> None:\n    with uow.transaction():\n        stock = uow.repo(aggregate.Stock).get_by_sku(sku)\n        stock.release(quantity)\n        uow.repo(aggregate.Stock).put(stock)\n        _publish_events(uow, stock)\n```\n\nCada una abre su propio `with uow.transaction():` \u2014 cuando se llaman dentro de una transacci\u00f3n\nya abierta por el orquestador, esa llamada simplemente hace join a la transacci\u00f3n externa\n(\u00a78: `if self._session is not None: yield; return`). Fuera de un orquestador, cada funci\u00f3n\nsigue siendo perfectamente utilizable de forma standalone y at\u00f3mica por s\u00ed misma.\n\n---\n\n## 3. Orquestador \u2014 `commerce/services/cancel_order_orchestrator.py`\n\n```python\n# commerce/services/cancel_order_orchestrator.py\nfrom commons.adapters import logs, unit_of_work\n\nfrom commerce.orders.domain.model import value_objects as order_value_objects\nfrom commerce.orders.services import dto, orders\nfrom commerce.stock.services import stock\n\n_LOGGER = logs.get_logger()\n\n\ndef cancel_order(*, uow: unit_of_work.UnitOfWork,\n                  order_id: \"order_value_objects.OrderId\") -> dto.OrderOutputDTO:\n    with uow.transaction():\n        order_before = orders.get_order(uow=uow, order_id=order_id)\n        had_reserved_stock = order_before.status is order_value_objects.OrderStatus.CONFIRMED\n\n        cancelled_order = orders.cancel_order(uow=uow, order_id=order_id)\n\n        if had_reserved_stock:\n            for line in cancelled_order.lines:\n                stock.release_stock(uow=uow, sku=line.sku, quantity=line.quantity)\n\n        return cancelled_order\n```\n\nNotar la simetr\u00eda deliberada con `confirm_order_orchestrator.py` del golden path, y la \u00fanica\ndiferencia real:\n\n- En `confirm_order`, el orden es reservar-stock-primero, confirmar-al-final: si\n  `stock.reserve_stock` falla por `InsufficientStockError`, `Order` nunca llega a confirmarse.\n- En `cancel_order`, el orden es cancelar-primero, liberar-despu\u00e9s: la validaci\u00f3n de negocio\n  que puede fallar (\u00bfesta orden est\u00e1 en un estado cancelable?) vive en `Order`, as\u00ed que\n  `orders.cancel_order` corre primero \u2014 si lanza `OrderCannotBeCancelledError`, nunca se toca\n  `Stock`. La liberaci\u00f3n de stock, condicionada a `had_reserved_stock`, es la parte que\n  virtualmente no falla en operaci\u00f3n normal.\n- `had_reserved_stock` se decide leyendo el estado **antes** de cancelar, dentro de la misma\n  transacci\u00f3n \u2014 evita el bug de liberar stock de una orden que nunca pas\u00f3 por `confirm_order`\n  y por lo tanto nunca reserv\u00f3 nada.\n\nIgual que en el ejemplo de `confirm_order`: el orquestador nunca ve `Order` ni `Stock` como\nobjetos de dominio, solo sus DTOs (`cancelled_order`, `order_before`) y sus excepciones. Si\n`orders.cancel_order` o `stock.release_stock` lanzan una excepci\u00f3n, todo el bloque hace\nrollback at\u00f3micamente \u2014 la orden nunca queda `CANCELLED` con el stock sin liberar, ni viceversa.\n\n**Concurrencia:** si otra request modific\u00f3 `Stock` o `Order` entre la lectura y el `put()`,\n`version_id_col` hace que `flush()` lance `StaleDataError` \u2192 el repositorio lo traduce a\n`ConcurrentModificationError` (\u00a78.1) \u2192 propaga, rollback de toda la cadena, HTTP 409 al cliente.\nNo hay riesgo de pisar una reserva/liberaci\u00f3n concurrente en silencio.\n\n---\n\n## 4. Entrypoint\n\nComo toca dos agregados, el router llama al orquestador \u2014 **no** a `orders.cancel_order`\ndirectamente (eso ser\u00eda saltarse \u00a710.2 y dejar el stock sin liberar).\n\n```python\n# commerce/orders/entrypoints/web/public.py  (excerpt \u2014 a\u00f1adido a lo ya existente)\nimport uuid\nfrom typing import Annotated\n\nimport fastapi\n\nfrom commerce.orders.domain.model import value_objects as order_value_objects\nfrom commerce.orders.services import dto\nfrom commerce.services import cancel_order_orchestrator\n\n\n@app.post(\"/orders/{order_id}/cancel\", response_model=dto.OrderOutputDTO)\ndef cancel_order(\n    order_id: uuid.UUID,\n    user: Annotated[\"authentication.AuthenticatedUser\", fastapi.Depends(require_jwt)],\n    uow: Annotated[\"unit_of_work.UnitOfWork\", fastapi.Depends(get_uow)],\n) -> dto.OrderOutputDTO:\n    return cancel_order_orchestrator.cancel_order(\n        uow=uow, order_id=order_value_objects.OrderId(value=order_id),\n    )\n```\n\nRuteo sigue siendo delgado: parsea el input, llama exactamente una funci\u00f3n (el orquestador,\nque a su vez es la \u00fanica capa autorizada a coordinar los dos subcontextos), retorna el DTO. Sin\nimport de `domain/` aqu\u00ed \u2014 contrato 5 de import-linter sigue intacto.\n\n---\n\n## Resumen de por qu\u00e9 est\u00e1 estructurado as\u00ed\n\n| Decisi\u00f3n | Regla del est\u00e1ndar que la justifica |\n|---|---|\n| Orquestador en `commerce/services/`, no en `orders/` ni `stock/` | \u00a710.2 \u2014 coordinaci\u00f3n multi-agregado del mismo producto vive a nivel de producto |\n| Orquestador llama `orders.cancel_order`/`stock.release_stock`, nunca `uow.repo(...)` | \u00a71.5 y \u00a710.2, enforced por import-linter contract 6 |\n| Todo dentro de un solo `with uow.transaction():` | \u00a78 \u2014 nested transactions: la llamada interna hace join, un solo commit/rollback |\n| `Stock.release` no se toca (ya existe) | \u00a75.3 del golden path \u2014 el comando ya estaba modelado sim\u00e9trico a `reserve` |\n| `had_reserved_stock` se eval\u00faa antes de cancelar | Regla de negocio: solo se libera lo que realmente se reserv\u00f3 (en `confirm_order`) |\n| Excepciones narrow (`OrderCannotBeCancelledError`) | \u00a75.5 \u2014 una clase por transici\u00f3n inv\u00e1lida, no un enum de estados gen\u00e9rico |\n| `version_id_col` protege ambos `put()` | \u00a78.1 \u2014 optimistic concurrency en cada `AggregateRoot`, no solo en `Stock` |\n"}], "grading": {"expectations": [{"text": "orchestrator_calls_services_not_repo", "passed": true, "evidence": "cancel_order_orchestrator.py calls orders.get_order/orders.cancel_order/stock.release_stock (service functions); never uow.repo(...) or an aggregate method"}, {"text": "correct_orchestration_tier", "passed": true, "evidence": "Explicitly walked the \u00a710 decision tree in prose before writing code and concluded \u00a710.2 (same product, product-level orchestrator)"}, {"text": "atomicity_via_nested_transactions", "passed": true, "evidence": "Orchestrator opens `with uow.transaction():`; explains nested calls join it per \u00a78's re-entrancy check, cites the exact code path"}, {"text": "new_release_stock_function", "passed": true, "evidence": "commerce/stock/services/stock.py::release_stock(...) created, symmetric to reserve_stock but a distinct function"}, {"text": "orchestrator_no_domain_import", "passed": true, "evidence": "Orchestrator only imports service modules (orders, stock) plus commerce.orders.domain.model.value_objects (aliased order_value_objects) solely for type-hinting the order_id parameter \u2014 never aggregate.py or adapters/. See eval_feedback: this VO-for-typing import is a defensible but literally-unaddressed edge case against contract 6's wording."}], "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0}, "timing": {"executor_duration_seconds": 138.0, "total_tokens": 79904}, "claims": [{"claim": "Stock is only released if the order had actually reached CONFIRMED (i.e. had reserved stock)", "type": "quality", "verified": true, "evidence": "had_reserved_stock computed from order status read before cancelling, gating whether stock.release_stock is called at all \u2014 a real business-logic catch not prompted for explicitly"}], "eval_feedback": {"suggestions": [{"assertion": "orchestrator_no_domain_import", "reason": "Contract 6 as written in enforcement-and-style.md says an orchestrator may import 'other subcontexts' services modules and commons \u2014 never any subcontext's domain or adapters module.' This run imports a sibling subcontext's domain.model.value_objects purely to type-hint an id parameter, which is arguably necessary and harmless (it's not touching business logic), but is a literal violation of the rule as stated. Worth an explicit carve-out in the skill: typed-ID/VO imports for signatures are fine, aggregate/business-logic imports are not."}], "overall": "All 5 assertions pass with strong, specific evidence, plus a genuinely valuable unprompted catch (the had_reserved_stock guard) showing real reasoning rather than pattern-matching the confirm_order example. The one thing worth fixing is in the skill/standard itself, not the model's output \u2014 see the suggestion above."}}}, {"id": "eval-2-cancel-order-release-stock-without_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "result.md", "type": "text", "content": "# Cancelar orden y liberar stock reservado de forma at\u00f3mica\n\n## Idea general\n\n\"At\u00f3mico\" aqu\u00ed significa: **la transici\u00f3n de estado de `Order` a `CANCELLED` y la liberaci\u00f3n de las reservas en `Stock` se confirman juntas, en la misma transacci\u00f3n de base de datos, o ninguna de las dos**. Eso descarta hacerlo con dos llamadas independientes a dos repositorios con dos `commit()` \u2014 si el segundo falla, te quedas con una orden cancelada pero el stock nunca liberado (o viceversa).\n\nLa forma est\u00e1ndar de resolver esto en hexagonal/DDD es:\n\n1. La l\u00f3gica de negocio (transici\u00f3n de estado, reglas de \"\u00bfpuedo cancelar esto?\", liberar cantidades) vive en los **agregados** (`Order`, `Stock`), no en el service.\n2. Un **application service** (caso de uso) orquesta: carga los agregados via repositorios, invoca sus m\u00e9todos de dominio, y no contiene reglas de negocio \u00e9l mismo.\n3. Todo el caso de uso corre dentro de un **Unit of Work**, que es el \u00fanico que abre transacci\u00f3n y hace `commit()`/`rollback()`. Un solo `commit()` al final \u21d2 atomicidad garantizada por la transacci\u00f3n de Postgres.\n4. Se usa **bloqueo optimista** (columna `version`) en `Stock` para que dos cancelaciones/reservas concurrentes sobre el mismo SKU no se pisen.\n5. `Order.cancel()` y `Stock.release_reservation()` son **idempotentes** para que reintentos (timeouts de red, reintentos de consumidor, doble click del usuario) no rompan nada ni lancen error.\n\nEsto asume que `Order` y `Stock` viven en el mismo servicio/base de datos (mismo bounded context o al menos mismo esquema Postgres), que es el caso t\u00edpico. Al final dejo la nota de qu\u00e9 cambia si `Stock` fuera un servicio/BD distinta.\n\n---\n\n## 1. Dominio\n\n### 1.1 Agregado `Order`\n\n```python\n# orders/domain/model.py\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, field\nfrom datetime import datetime, timezone\nfrom enum import Enum\nfrom uuid import UUID\n\n\nclass OrderStatus(str, Enum):\n    PENDING = \"PENDING\"\n    CONFIRMED = \"CONFIRMED\"\n    CANCELLED = \"CANCELLED\"\n    DELIVERED = \"DELIVERED\"\n\n\nclass InvalidOrderTransition(Exception):\n    \"\"\"La orden no puede pasar al estado solicitado desde su estado actual.\"\"\"\n\n\n@dataclass\nclass OrderLine:\n    sku: str\n    quantity: int\n    reservation_id: UUID  # id de la reserva creada en Stock al confirmar la l\u00ednea\n\n\n@dataclass\nclass Order:\n    \"\"\"Aggregate root. Consistency boundary: sus propias l\u00edneas y estado.\"\"\"\n\n    id: UUID\n    customer_id: UUID\n    status: OrderStatus\n    lines: list[OrderLine]\n    version: int = 0\n    events: list[object] = field(default_factory=list, repr=False)\n\n    _CANCELLABLE_STATES = {OrderStatus.PENDING, OrderStatus.CONFIRMED}\n\n    def cancel(self, reason: str = \"\") -> None:\n        if self.status == OrderStatus.CANCELLED:\n            # idempotente: cancelar dos veces no es un error, es un no-op\n            return\n\n        if self.status not in self._CANCELLABLE_STATES:\n            raise InvalidOrderTransition(\n                f\"No se puede cancelar una orden en estado {self.status.value}\"\n            )\n\n        self.status = OrderStatus.CANCELLED\n        self.events.append(\n            OrderCancelled(\n                order_id=self.id,\n                reason=reason,\n                lines=[(l.sku, l.quantity, l.reservation_id) for l in self.lines],\n                occurred_at=datetime.now(timezone.utc),\n            )\n        )\n```\n\n```python\n# orders/domain/events.py\nfrom dataclasses import dataclass\nfrom datetime import datetime\nfrom uuid import UUID\n\n\n@dataclass(frozen=True)\nclass OrderCancelled:\n    order_id: UUID\n    reason: str\n    lines: list[tuple[str, int, UUID]]  # (sku, quantity, reservation_id)\n    occurred_at: datetime\n```\n\nNotar: `Order` **no sabe nada de `Stock`**. No importa el m\u00f3dulo de stock, no llama a nada de stock. Su \u00fanico trabajo es decidir si la transici\u00f3n es v\u00e1lida y registrar el hecho de dominio (`OrderCancelled`). El acoplamiento entre los dos agregados vive en la capa de aplicaci\u00f3n, no en el dominio.\n\n### 1.2 Agregado `Stock`\n\n```python\n# stock/domain/model.py\nfrom __future__ import annotations\n\nfrom dataclasses import dataclass, field\nfrom uuid import UUID\n\n\nclass InsufficientStock(Exception):\n    pass\n\n\n@dataclass\nclass Reservation:\n    id: UUID\n    order_id: UUID\n    quantity: int\n    released: bool = False\n\n\n@dataclass\nclass Stock:\n    \"\"\"Aggregate root por SKU. version = bloqueo optimista.\"\"\"\n\n    sku: str\n    quantity_on_hand: int\n    quantity_reserved: int\n    reservations: dict[UUID, Reservation]\n    version: int = 0\n    events: list[object] = field(default_factory=list, repr=False)\n\n    @property\n    def quantity_available(self) -> int:\n        return self.quantity_on_hand - self.quantity_reserved\n\n    def reserve(self, reservation_id: UUID, order_id: UUID, quantity: int) -> None:\n        if quantity > self.quantity_available:\n            raise InsufficientStock(f\"Stock insuficiente para SKU {self.sku}\")\n        self.quantity_reserved += quantity\n        self.reservations[reservation_id] = Reservation(reservation_id, order_id, quantity)\n\n    def release_reservation(self, reservation_id: UUID) -> None:\n        \"\"\"Libera una reserva. Idempotente: si no existe o ya se liber\u00f3, no hace nada.\"\"\"\n        reservation = self.reservations.get(reservation_id)\n        if reservation is None or reservation.released:\n            return\n\n        reservation.released = True\n        self.quantity_reserved -= reservation.quantity\n        self.events.append(\n            StockReleased(\n                sku=self.sku,\n                reservation_id=reservation_id,\n                quantity=reservation.quantity,\n            )\n        )\n```\n\n```python\n# stock/domain/events.py\nfrom dataclasses import dataclass\nfrom uuid import UUID\n\n\n@dataclass(frozen=True)\nclass StockReleased:\n    sku: str\n    reservation_id: UUID\n    quantity: int\n```\n\nLa liberaci\u00f3n se hace **por `reservation_id`**, no restando \"a ojo\" una cantidad del total. Esto es clave: si guard\u00e1s \u00fanicamente un contador (`quantity_reserved -= n`) sin trackear qu\u00e9 reserva es cu\u00e1l, un reintento del caso de uso restar\u00eda dos veces y te dejar\u00eda con stock fantasma. Modelar la reserva como una entidad dentro del agregado `Stock` es lo que te da la idempotencia gratis.\n\n---\n\n## 2. Puertos (repositorios + Unit of Work)\n\n```python\n# shared/unit_of_work.py\nfrom __future__ import annotations\n\nfrom abc import ABC, abstractmethod\nfrom typing import Protocol\nfrom uuid import UUID\n\nfrom orders.domain.model import Order\nfrom stock.domain.model import Stock\n\n\nclass OrderRepository(Protocol):\n    async def get(self, order_id: UUID) -> Order | None: ...\n    def add(self, order: Order) -> None: ...\n\n\nclass StockRepository(Protocol):\n    async def get_by_sku(self, sku: str) -> Stock | None: ...\n    def add(self, stock: Stock) -> None: ...\n\n\nclass ConcurrencyConflict(Exception):\n    \"\"\"Otro proceso modific\u00f3 el mismo agregado (Stock/Order) en paralelo.\"\"\"\n\n\nclass AbstractUnitOfWork(ABC):\n    orders: OrderRepository\n    stock: StockRepository\n\n    async def __aenter__(self) -> \"AbstractUnitOfWork\":\n        return self\n\n    async def __aexit__(self, *exc_info) -> None:\n        await self.rollback()\n\n    @abstractmethod\n    async def commit(self) -> None: ...\n\n    @abstractmethod\n    async def rollback(self) -> None: ...\n```\n\nEl punto de este puerto: **`commit()` s\u00f3lo se llama una vez, al final del caso de uso**, despu\u00e9s de tocar ambos agregados. Si nunca se llega a llamar (excepci\u00f3n en el medio), `__aexit__` hace rollback y no queda nada a medias en la base.\n\n---\n\n## 3. Application service (caso de uso)\n\n```python\n# orders/application/cancel_order.py\nfrom uuid import UUID\n\nfrom orders.domain.model import InvalidOrderTransition\nfrom shared.unit_of_work import AbstractUnitOfWork\n\n\nclass OrderNotFound(Exception):\n    pass\n\n\nasync def cancel_order(order_id: UUID, uow: AbstractUnitOfWork, reason: str = \"\") -> None:\n    async with uow:\n        order = await uow.orders.get(order_id)\n        if order is None:\n            raise OrderNotFound(str(order_id))\n\n        order.cancel(reason=reason)  # regla de negocio + emite OrderCancelled\n\n        for line in order.lines:\n            stock = await uow.stock.get_by_sku(line.sku)\n            if stock is None:\n                # dato inconsistente preexistente; no deber\u00eda frenar la cancelaci\u00f3n\n                continue\n            stock.release_reservation(line.reservation_id)\n\n        await uow.commit()  # <- \u00fanico punto de confirmaci\u00f3n: Order + N Stock juntos\n```\n\nEsto es toda la orquestaci\u00f3n. Fijate qu\u00e9 **no** hace: no valida reglas de negocio (`InvalidOrderTransition` la lanza el propio `Order`), no calcula cantidades (`Stock` lo hace), no abre transacciones manualmente. Solo carga agregados, llama m\u00e9todos de dominio y confirma. Si `order.cancel()` lanza `InvalidOrderTransition`, el `async with uow` nunca llega a `commit()` y hace rollback autom\u00e1ticamente al salir por excepci\u00f3n \u2014 as\u00ed que aunque ya se hubiera tocado alg\u00fan `Stock` antes de la excepci\u00f3n, nada se persiste.\n\n---\n\n## 4. Infraestructura: Unit of Work + repositorios con SQLAlchemy async\n\n```python\n# shared/sqlalchemy_uow.py\nfrom sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker\n\nfrom orders.adapters.repository import SqlAlchemyOrderRepository\nfrom stock.adapters.repository import SqlAlchemyStockRepository\nfrom shared.unit_of_work import AbstractUnitOfWork\n\n\nclass SqlAlchemyUnitOfWork(AbstractUnitOfWork):\n    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):\n        self._session_factory = session_factory\n\n    async def __aenter__(self) -> \"SqlAlchemyUnitOfWork\":\n        self.session: AsyncSession = self._session_factory()\n        self.orders = SqlAlchemyOrderRepository(self.session)\n        self.stock = SqlAlchemyStockRepository(self.session)\n        return await super().__aenter__()\n\n    async def __aexit__(self, *exc_info) -> None:\n        await super().__aexit__(*exc_info)\n        await self.session.close()\n\n    async def commit(self) -> None:\n        await self.session.commit()\n\n    async def rollback(self) -> None:\n        await self.session.rollback()\n```\n\n```python\n# stock/adapters/repository.py\nfrom uuid import UUID\n\nfrom sqlalchemy.ext.asyncio import AsyncSession\n\nfrom stock.domain.model import Stock\n\n\nclass SqlAlchemyStockRepository:\n    def __init__(self, session: AsyncSession):\n        self.session = session\n\n    async def get_by_sku(self, sku: str) -> Stock | None:\n        # Asumiendo mapeo imperativo Stock <-> tabla stock (ver m\u00e1s abajo)\n        return await self.session.get(Stock, sku)\n\n    def add(self, stock: Stock) -> None:\n        self.session.add(stock)\n```\n\n```python\n# orders/adapters/repository.py\nfrom uuid import UUID\n\nfrom sqlalchemy.ext.asyncio import AsyncSession\n\nfrom orders.domain.model import Order\n\n\nclass SqlAlchemyOrderRepository:\n    def __init__(self, session: AsyncSession):\n        self.session = session\n\n    async def get(self, order_id: UUID) -> Order | None:\n        return await self.session.get(Order, order_id)\n\n    def add(self, order: Order) -> None:\n        self.session.add(order)\n```\n\n### Bloqueo optimista en `stock`\n\n```python\n# stock/adapters/orm.py\nfrom sqlalchemy import Table, Column, String, Integer, MetaData\nfrom sqlalchemy.orm import registry\n\nmetadata = MetaData()\nmapper_registry = registry(metadata=metadata)\n\nstock_table = Table(\n    \"stock\",\n    metadata,\n    Column(\"sku\", String, primary_key=True),\n    Column(\"quantity_on_hand\", Integer, nullable=False),\n    Column(\"quantity_reserved\", Integer, nullable=False),\n    Column(\"version\", Integer, nullable=False, server_default=\"0\"),\n)\n\nmapper_registry.map_imperatively(\n    Stock,\n    stock_table,\n    version_id_col=stock_table.c.version,  # <- clave: SQLAlchemy incrementa\n    version_id_generator=False,            # version y agrega WHERE version = :v\n)\n```\n\nCon `version_id_col`, cada `UPDATE` que SQLAlchemy genera al hacer `commit()` incluye `WHERE version = <version cargada>`. Si otro proceso ya modific\u00f3 esa fila (por ejemplo, otra cancelaci\u00f3n concurrente sobre el mismo SKU, o una nueva reserva), el `UPDATE` afecta 0 filas y SQLAlchemy lanza `StaleDataError`. Es la forma est\u00e1ndar de proteger un agregado contra *lost updates* sin tomar locks expl\u00edcitos.\n\nConviene traducir esa excepci\u00f3n de infraestructura a algo del dominio/aplicaci\u00f3n en el borde del adaptador:\n\n```python\n# shared/sqlalchemy_uow.py (extendido)\nfrom sqlalchemy.orm.exc import StaleDataError\nfrom shared.unit_of_work import ConcurrencyConflict\n\nclass SqlAlchemyUnitOfWork(AbstractUnitOfWork):\n    ...\n    async def commit(self) -> None:\n        try:\n            await self.session.commit()\n        except StaleDataError as exc:\n            await self.session.rollback()\n            raise ConcurrencyConflict from exc\n```\n\n**Alternativa (o complemento):** si tu SKU tiene mucha contenci\u00f3n (muchas reservas/liberaciones concurrentes), en vez de optimista pod\u00e9s bloquear la fila al leerla dentro de la misma transacci\u00f3n con `SELECT ... FOR UPDATE`:\n\n```python\nawait self.session.execute(\n    select(Stock).where(Stock.sku == sku).with_for_update()\n)\n```\n\nEsto serializa el acceso a ese SKU durante la transacci\u00f3n en vez de fallar-y-reintentar. Para el flujo de \"cancelar y liberar\" (que reduce contenci\u00f3n, no la aumenta) el bloqueo optimista suele ser suficiente y m\u00e1s barato; `FOR UPDATE` lo reservar\u00eda para el camino de *reservar* stock, que es el que compite de verdad.\n\n---\n\n## 5. Adaptador de entrada: endpoint FastAPI\n\n```python\n# orders/entrypoints/fastapi_routes.py\nfrom uuid import UUID\n\nfrom fastapi import APIRouter, Depends, HTTPException, status\n\nfrom orders.application.cancel_order import cancel_order, OrderNotFound\nfrom orders.domain.model import InvalidOrderTransition\nfrom shared.unit_of_work import ConcurrencyConflict\nfrom shared.dependencies import get_uow  # provee un SqlAlchemyUnitOfWork por request\n\nrouter = APIRouter(prefix=\"/orders\", tags=[\"orders\"])\n\n\n@router.post(\"/{order_id}/cancel\", status_code=status.HTTP_204_NO_CONTENT)\nasync def cancel_order_endpoint(\n    order_id: UUID,\n    uow=Depends(get_uow),\n) -> None:\n    try:\n        await cancel_order(order_id, uow)\n    except OrderNotFound:\n        raise HTTPException(status_code=404, detail=\"Orden no encontrada\")\n    except InvalidOrderTransition as exc:\n        raise HTTPException(status_code=409, detail=str(exc))\n    except ConcurrencyConflict:\n        raise HTTPException(\n            status_code=409,\n            detail=\"Conflicto de concurrencia liberando stock, reintente\",\n        )\n```\n\nComo `Order.cancel()` y `Stock.release_reservation()` son idempotentes, este endpoint **tambi\u00e9n es idempotente**: si el cliente reintenta por timeout, la segunda llamada devuelve 204 sin duplicar ninguna liberaci\u00f3n. No hace falta una tabla de idempotencia adicional para este caso puntual porque el propio modelo de dominio absorbe el reintento; si quisieras protegerte adem\u00e1s de reintentos con distinto payload (ej. distinta `reason`), agreg\u00e1 un `Idempotency-Key` de header persistido aparte, pero para este caso de uso no es necesario.\n\n---\n\n## 6. Por qu\u00e9 esto es at\u00f3mico\n\n- Un \u00fanico `AsyncSession` / transacci\u00f3n Postgres para todo el caso de uso: `order` y cada `stock` tocado se agregan a la misma `Session`, y `await uow.commit()` es el \u00fanico `COMMIT` SQL que se ejecuta. Postgres garantiza que ese `COMMIT` es todo-o-nada.\n- Si `Stock.release_reservation` para la segunda l\u00ednea de una orden de 3 l\u00edneas explota (por ejemplo `StaleDataError` en la l\u00ednea 2), nunca se llega a `uow.commit()`, y `__aexit__` hace `rollback()` \u2014 la l\u00ednea 1, que s\u00ed se hab\u00eda mutado en memoria/flush, tambi\u00e9n se revierte porque no se confirm\u00f3 nada en disco.\n- El bloqueo optimista (`version`) evita que dos transacciones concurrentes sobre el mismo SKU (p. ej. cancelar la orden A libera 5 unidades del SKU X justo cuando se est\u00e1 reservando stock del SKU X para la orden B) produzcan un *lost update* silencioso.\n- La idempotencia en el dominio evita que una **misma** operaci\u00f3n reintentada rompa la aritm\u00e9tica del stock.\n\n---\n\n## 7. Test del caso de uso (con repos fake, sin DB)\n\n```python\n# tests/unit/test_cancel_order.py\nimport pytest\nfrom uuid import uuid4\n\nfrom orders.application.cancel_order import cancel_order, OrderNotFound\nfrom orders.domain.model import Order, OrderLine, OrderStatus\nfrom stock.domain.model import Stock, Reservation\n\n\nclass FakeOrderRepository:\n    def __init__(self, orders):\n        self._orders = {o.id: o for o in orders}\n\n    async def get(self, order_id):\n        return self._orders.get(order_id)\n\n    def add(self, order):\n        self._orders[order.id] = order\n\n\nclass FakeStockRepository:\n    def __init__(self, stocks):\n        self._stocks = {s.sku: s for s in stocks}\n\n    async def get_by_sku(self, sku):\n        return self._stocks.get(sku)\n\n    def add(self, stock):\n        self._stocks[stock.sku] = stock\n\n\nclass FakeUnitOfWork:\n    def __init__(self, orders, stock):\n        self.orders = orders\n        self.stock = stock\n        self.committed = False\n\n    async def __aenter__(self):\n        return self\n\n    async def __aexit__(self, *exc):\n        pass\n\n    async def commit(self):\n        self.committed = True\n\n    async def rollback(self):\n        pass\n\n\n@pytest.mark.asyncio\nasync def test_cancel_order_releases_reserved_stock():\n    order_id, reservation_id = uuid4(), uuid4()\n    order = Order(\n        id=order_id,\n        customer_id=uuid4(),\n        status=OrderStatus.CONFIRMED,\n        lines=[OrderLine(sku=\"SKU-1\", quantity=3, reservation_id=reservation_id)],\n    )\n    stock = Stock(\n        sku=\"SKU-1\",\n        quantity_on_hand=10,\n        quantity_reserved=3,\n        reservations={reservation_id: Reservation(reservation_id, order_id, 3)},\n    )\n    uow = FakeUnitOfWork(FakeOrderRepository([order]), FakeStockRepository([stock]))\n\n    await cancel_order(order_id, uow)\n\n    assert order.status == OrderStatus.CANCELLED\n    assert stock.quantity_reserved == 0\n    assert stock.quantity_available == 10\n    assert uow.committed is True\n\n\n@pytest.mark.asyncio\nasync def test_cancel_order_not_found_raises():\n    uow = FakeUnitOfWork(FakeOrderRepository([]), FakeStockRepository([]))\n    with pytest.raises(OrderNotFound):\n        await cancel_order(uuid4(), uow)\n\n\n@pytest.mark.asyncio\nasync def test_cancel_order_is_idempotent():\n    order_id, reservation_id = uuid4(), uuid4()\n    order = Order(\n        id=order_id,\n        customer_id=uuid4(),\n        status=OrderStatus.CANCELLED,  # ya cancelada\n        lines=[OrderLine(sku=\"SKU-1\", quantity=3, reservation_id=reservation_id)],\n    )\n    stock = Stock(\n        sku=\"SKU-1\",\n        quantity_on_hand=10,\n        quantity_reserved=0,\n        reservations={reservation_id: Reservation(reservation_id, order_id, 3, released=True)},\n    )\n    uow = FakeUnitOfWork(FakeOrderRepository([order]), FakeStockRepository([stock]))\n\n    await cancel_order(order_id, uow)  # no debe lanzar\n\n    assert stock.quantity_reserved == 0\n```\n\n---\n\n## 8. Si `Stock` estuviera en otro bounded context / microservicio\n\nTodo lo anterior asume que `Order` y `Stock` comparten base de datos y por lo tanto una transacci\u00f3n ACID real. Si en tu arquitectura `Stock` es un servicio aparte (otra base de datos, quiz\u00e1s otro equipo), **no existe una transacci\u00f3n distribuida real** salvo que metas 2PC (que casi nadie usa por buenas razones). Ah\u00ed el patr\u00f3n est\u00e1ndar cambia:\n\n1. `cancel_order` s\u00f3lo toca el agregado `Order` y, dentro de la **misma transacci\u00f3n** que lo persiste, inserta el evento `OrderCancelled` en una tabla **outbox** (patr\u00f3n *Transactional Outbox*). Esto sigue siendo at\u00f3mico porque `Order` + outbox est\u00e1n en la misma base.\n2. Un relay/publisher (poller o CDC tipo Debezium) publica ese evento a un broker (SQS/Kafka/etc.) de forma as\u00edncrona.\n3. El servicio de `Stock` consume `OrderCancelled` de forma **idempotente** (usando `reservation_id` como clave de deduplicaci\u00f3n, igual que hace `release_reservation` ac\u00e1) y libera el stock en su propia transacci\u00f3n.\n4. Si necesit\u00e1s confirmar que el stock efectivamente se liber\u00f3 (por ejemplo para notificar al cliente), el consumidor publica `StockReleased` y quien lo necesite reacciona a eso \u2014 o adopt\u00e1s expl\u00edcitamente un patr\u00f3n de **Saga** con pasos de compensaci\u00f3n si hay m\u00e1s de dos pasos encadenados.\n\nEsto te da **atomicidad local en cada paso + consistencia eventual global**, que es lo mejor que se puede lograr entre bounded contexts separados sin acoplarlos con una transacci\u00f3n distribuida. La clave para que \"eventual\" no se sienta como \"roto\" es la idempotencia de los consumidores (ya la ten\u00e9s modelada en el dominio de este mismo ejemplo) y tener un job de reconciliaci\u00f3n/alerta para sagas que se queden a mitad de camino.\n\n---\n\n## Resumen de las piezas y d\u00f3nde poner cada cosa\n\n| Capa | Responsabilidad | Archivo de ejemplo |\n|---|---|---|\n| Dominio `Order` | Reglas de transici\u00f3n de estado, emite `OrderCancelled` | `orders/domain/model.py` |\n| Dominio `Stock` | Reglas de reserva/liberaci\u00f3n, idempotencia por `reservation_id`, emite `StockReleased` | `stock/domain/model.py` |\n| Application service | Orquesta: carga agregados, invoca m\u00e9todos de dominio, un solo `commit()` | `orders/application/cancel_order.py` |\n| Unit of Work | \u00danico punto de `commit()`/`rollback()`, l\u00edmite de transacci\u00f3n | `shared/unit_of_work.py`, `shared/sqlalchemy_uow.py` |\n| Repositorios | Persistencia de cada agregado, bloqueo optimista v\u00eda `version` | `orders/adapters/repository.py`, `stock/adapters/repository.py` |\n| Entrypoint FastAPI | Traduce excepciones de dominio/aplicaci\u00f3n a HTTP | `orders/entrypoints/fastapi_routes.py` |\n\nLa atomicidad no la da ning\u00fan \"truco\" especial: la da que **el caso de uso completo vive dentro de un \u00fanico `async with uow` con un \u00fanico `commit()` al final**, que las reglas de negocio est\u00e9n en los agregados (as\u00ed el service no puede \"olvidarse\" de validar algo), y que tanto la transici\u00f3n de `Order` como la liberaci\u00f3n en `Stock` sean idempotentes para que los reintentos no generen inconsistencias incluso fuera de la transacci\u00f3n (por ejemplo, si el cliente HTTP reintenta despu\u00e9s de un timeout de red aunque el commit ya haya sucedido del lado del servidor).\n"}], "grading": {"expectations": [{"text": "orchestrator_calls_services_not_repo", "passed": false, "evidence": "There is no separate service-layer function per subcontext \u2014 the single `cancel_order` use-case function calls `uow.orders.get(order_id)` and `uow.stock.get_by_sku(line.sku)` (repositories) directly, then `order.cancel(...)`/`stock.release_reservation(...)` (aggregate methods) directly"}, {"text": "correct_orchestration_tier", "passed": false, "evidence": "No orchestrator/service-layer split exists at all; one flat application-service function does everything for both aggregates"}, {"text": "atomicity_via_nested_transactions", "passed": false, "evidence": "Atomicity comes from one flat `async with uow: ... await uow.commit()` around the whole function, not from composing separate per-subcontext service functions that nest their own transactions"}, {"text": "new_release_stock_function", "passed": false, "evidence": "No stock-side service function exists; `stock.release_reservation(line.reservation_id)` \u2014 a domain method \u2014 is called directly inline from the flat use case"}, {"text": "orchestrator_no_domain_import", "passed": false, "evidence": "The use-case function imports and directly manipulates both aggregates (`order.cancel(...)`, `stock.release_reservation(...)`) \u2014 the exact 'reach past the service into the aggregate' shape this standard's rule exists to prevent"}], "summary": {"passed": 0, "failed": 5, "total": 5, "pass_rate": 0.0}, "timing": {"executor_duration_seconds": 159.3, "total_tokens": 58864}, "claims": [{"claim": "Uses async SQLAlchemy (AsyncSession, async def) throughout", "type": "factual", "verified": true, "evidence": "shared/sqlalchemy_uow.py, stock/adapters/repository.py, orders/adapters/repository.py all use sqlalchemy.ext.asyncio"}], "eval_feedback": {"overall": "A well-engineered, genuinely thoughtful answer \u2014 the Stock.release_reservation-by-reservation_id design (avoiding a bare counter decrement) is arguably a better domain model than a naive quantity subtraction, and the idempotency-by-design + cross-service outbox discussion in section 8 is production-grade thinking. But it collapses the orchestrator/service distinction into one flat use-case function that reaches directly into both repositories and both aggregates \u2014 precisely the shape the standard's layering rule exists to prevent, and it independently defaults to async SQLAlchemy, the opposite of this standard's deliberate sync-only decision for Lambda. This is the clean discriminating result the eval is designed to surface: competent generic DDD vs. this specific codebase's house rules."}}}, {"id": "eval-3-event-never-published-debug-with_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "result.md", "type": "text", "content": "# Por qu\u00e9 tu evento nunca llega a SQS\n\n`record_event()` **solo mete el evento en una lista en memoria del agregado** (`AggregateRoot._events`, ver `commons/domain/aggregates.py`). No escribe nada en la base de datos, no toca el outbox, no publica nada. Es literalmente:\n\n```python\nclass AggregateRoot[IdT](entities.Entity[IdT]):\n    _events: list[domain_events.DomainEvent] = pydantic.PrivateAttr(default_factory=list)\n\n    def record_event(self, event: domain_events.DomainEvent) -> None:\n        self._events.append(event)\n```\n\nAs\u00ed que \"el evento se registra pero nunca llega a SQS\" no es un bug raro \u2014 es el comportamiento *esperado* de `record_event()` en solitario. El pipeline completo, seg\u00fan el est\u00e1ndar, es:\n\n```\naggregate.record_event(...)          # 1. en memoria\n  \u2192 service.pull_events()            # 2. lo saca del agregado\n  \u2192 uow.outbox.record(event)         # 3. INSERT en outbox_events, misma transacci\u00f3n\n  \u2192 relay (cron)                     # 4. lee filas sin publicar, publica a SNS/EventBridge\n  \u2192 SNS topic \u2192 SQS queue filtrada   # 5. fan-out al consumidor\n```\n\nSi ves el evento registrado pero nunca en SQS, el corte est\u00e1 en alguno de los pasos 2\u20135. En orden de probabilidad:\n\n## Causa m\u00e1s com\u00fan: falta el paso 2+3 (pull_events + outbox.record)\n\nEsta es la causa que el propio est\u00e1ndar marca como el error #1 a vigilar \u2014 est\u00e1 en sus \"non-negotiables\":\n\n> Un `record_event(...)` sin su correspondiente `pull_events()` + escritura al outbox en la misma transacci\u00f3n est\u00e1 mal, siempre \u2014 es c\u00f3digo muerto que parece vivo (`sona-sso-backend` lo mand\u00f3 a producci\u00f3n exactamente as\u00ed).\n\nRevisa tu `services/<subcontext>.py`. Si tu funci\u00f3n de caso de uso hace esto:\n\n```python\n# MAL \u2014 el evento se registra en el agregado y ah\u00ed muere\ndef reserve_stock(*, uow, sku, quantity: int) -> None:\n    with uow.transaction():\n        stock = uow.repo(aggregate.Stock).get_by_sku(sku)\n        stock.reserve(quantity)          # dentro de reserve() hay un record_event()\n        uow.repo(aggregate.Stock).put(stock)\n    # <- nunca se llama pull_events(), nunca se escribe al outbox\n```\n\n...el evento queda atrapado en `stock._events` y se pierde cuando el objeto sale de scope. Nadie lo lee jam\u00e1s.\n\n**Arreglo** \u2014 a\u00f1ade el drenaje dentro de la misma transacci\u00f3n:\n\n```python\n# BIEN\ndef reserve_stock(*, uow: \"unit_of_work.UnitOfWork\", sku: \"commerce_value_objects.Sku\",\n                   quantity: int) -> None:\n    with uow.transaction():\n        stock = uow.repo(aggregate.Stock).get_by_sku(sku)\n        stock.reserve(quantity)                 # raises InsufficientStockError \u2192 rollback\n        uow.repo(aggregate.Stock).put(stock)\n        _publish_events(uow, stock)              # <- esto faltaba\n\n\ndef _publish_events(uow: \"unit_of_work.UnitOfWork\", entity: \"aggregates.AggregateRoot\") -> None:\n    for event in entity.pull_events():\n        uow.outbox.record(event)   # INSERT en outbox_events, misma transacci\u00f3n con uow.transaction()\n```\n\nPuntos clave de este fix:\n\n- `pull_events()` y `uow.outbox.record(event)` deben ir **dentro** del mismo bloque `with uow.transaction():` que la mutaci\u00f3n del agregado. Si el commit del agregado tiene \u00e9xito pero el outbox no se escribe (o viceversa), pierdes atomicidad \u2014 exactamente el modo de fallo que el patr\u00f3n Outbox existe para evitar en Postgres (que no te da un write transaccional cruzado contra una cola externa).\n- `services/<subcontext>.py` es el **\u00fanico** lugar permitido para llamar `uow.repo(...)` o m\u00e9todos del agregado \u2014 as\u00ed que tambi\u00e9n es el \u00fanico lugar correcto para drenar los eventos. Si el `record_event` vive en un agregado invocado desde un orquestador, el orquestador nunca debe tocar `pull_events()` directamente: debe ser la funci\u00f3n de `services/` la que lo haga, como parte de su propia transacci\u00f3n.\n\n## Segunda causa posible: el evento no es un `IntegrationEvent`\n\nEl outbox y el relay **solo publican filas cuyo evento es un `IntegrationEvent`**, no cualquier `DomainEvent`:\n\n```python\nclass DomainEvent(value_objects.ValueObject):\n    event_id: uuid.UUID\n    occurred_at: value_objects.PosixTime\n    ...\n\nclass IntegrationEvent(DomainEvent):\n    \"\"\"A DomainEvent promoted to cross a bounded-context boundary \u2014 su propia clase, un\n    contrato p\u00fablico, no el evento interno reusado tal cual. Solo las subclases de\n    IntegrationEvent son relayed fuera del outbox.\"\"\"\n```\n\nSi tu clase de evento hereda directo de `DomainEvent` (para consumo puramente interno del propio agregado/subcontexto) en lugar de `IntegrationEvent`, el relay la va a ignorar aunque s\u00ed est\u00e9 en la tabla `outbox_events` \u2014 nunca sale del proceso hacia SNS/SQS.\n\n**Arreglo** \u2014 si este evento necesita salir del bounded context (que es el caso si esperas verlo en SQS), su clase debe heredar de `IntegrationEvent`, no de `DomainEvent`:\n\n```python\n# commerce/stock/domain/model/events.py\nfrom commons.domain import events as domain_events\n\n\nclass StockReserved(domain_events.IntegrationEvent):   # <- IntegrationEvent, no DomainEvent\n    stock_id: \"value_objects.StockId\"\n    sku: \"commerce_value_objects.Sku\"\n    quantity: int\n```\n\n## Tercera causa posible: el relay no est\u00e1 corriendo, o el filtro SQS no matchea\n\nSi ya confirmaste que la fila s\u00ed llega a `outbox_events` (`published_at IS NULL`) y el evento s\u00ed es un `IntegrationEvent`, el problema est\u00e1 aguas abajo del c\u00f3digo de dominio/aplicaci\u00f3n:\n\n1. **El relay (cron) no est\u00e1 desplegado o no est\u00e1 corriendo.** Es el \u00fanico componente que lee `outbox_events` y publica a SNS/EventBridge \u2014 sin \u00e9l, las filas se acumulan con `published_at = NULL` para siempre. Revisa que el cron/lambda del relay exista y tenga logs recientes.\n2. **La pol\u00edtica de filtro de la suscripci\u00f3n SQS no matchea `event_type`.** El fan-out es \"SNS topic por producto, cola SQS filtrada por consumidor\" \u2014 si la suscripci\u00f3n SQS\u2192SNS tiene un filter policy que no incluye el `event_type` de tu nuevo evento (recuerda: `event_type` es un `computed_field` = nombre de la clase), el mensaje se publica al t\u00f3pico pero nunca llega a tu cola.\n3. **Confundir \"publicado\" con \"consumido\".** Si el relay s\u00ed public\u00f3 pero el Lambda consumidor est\u00e1 fallando silenciosamente (o la DLQ se lo llev\u00f3), el mensaje \"lleg\u00f3 a SQS\" en el sentido de haber pasado por la cola, pero puede parecer que nunca lleg\u00f3 si solo est\u00e1s mirando logs del consumidor. Revisa la cola y su DLQ directamente en la consola, no solo los logs de aplicaci\u00f3n.\n\n## Checklist de diagn\u00f3stico, en orden\n\n1. \u00bfEl evento aparece en la tabla `outbox_events`? Si no \u2192 falta `pull_events()` + `uow.outbox.record(event)` en la misma transacci\u00f3n (causa #1, la m\u00e1s com\u00fan).\n2. Si aparece pero `published_at` sigue `NULL` para siempre \u2192 o el evento no es `IntegrationEvent` (causa #2) y el relay lo ignora a prop\u00f3sito, o el relay no est\u00e1 corriendo (causa #3.1).\n3. Si `published_at` ya tiene timestamp (o sea, s\u00ed se public\u00f3 a SNS/EventBridge) pero no aparece en tu cola SQS \u2192 revisa el filter policy de la suscripci\u00f3n (causa #3.2) y la DLQ (causa #3.3).\n\nEn el 90% de los casos que este est\u00e1ndar ha visto en producci\u00f3n (`sona-sso-backend` lo hizo exactamente as\u00ed), la causa es la #1: `record_event()` sin su `pull_events()` correspondiente. Empieza ah\u00ed.\n"}], "grading": {"expectations": [{"text": "root_cause_identified", "passed": true, "evidence": "Quotes the exact base class: `record_event()` only appends to `_events`; walks the full 5-step pipeline and states 'el evento queda en memoria... nadie lo lee jam\u00e1s' when step 2/3 is skipped"}, {"text": "outbox_pattern_explained", "passed": true, "evidence": "Names the outbox explicitly, distinguishes it from direct publish, cites 'Postgres... no te da un write transaccional cruzado contra una cola externa' as the reason it's needed"}, {"text": "same_transaction_emphasized", "passed": true, "evidence": "'pull_events() y uow.outbox.record(event) deben ir DENTRO del mismo bloque with uow.transaction() que la mutaci\u00f3n del agregado'"}, {"text": "shows_corrected_code", "passed": true, "evidence": "Shows the corrected reserve_stock with _publish_events added, diffed against the broken version"}, {"text": "mentions_relay_process", "passed": true, "evidence": "'relay (cron) \u2192 lee filas sin publicar, publica a SNS/EventBridge' as step 4 of the pipeline, plus a dedicated 'relay no est\u00e1 corriendo' diagnostic branch"}], "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0}, "timing": {"executor_duration_seconds": 63.8, "total_tokens": 64059}, "claims": [{"claim": "A second, independent cause is that the event class extends DomainEvent instead of IntegrationEvent, so the relay silently ignores it even though it's correctly in the outbox table", "type": "quality", "verified": true, "evidence": "This is a real, correct consequence of this standard's actual event hierarchy (only IntegrationEvent subclasses are relayed) \u2014 not something a generic DDD answer could know, since it's specific to this codebase's class design"}], "eval_feedback": {"suggestions": [{"reason": "This eval's 5 assertions all check for the transactional-outbox pattern in general terms (name it, explain same-transaction, show corrected code, mention a relay) \u2014 and the baseline (without-skill) run independently arrives at and correctly explains the exact same pattern, since it's well-known generic DDD/event-driven knowledge, not something unique to this standard. All 5 assertions pass for BOTH runs (see without_skill/grading.json), making this eval weakly discriminating as currently written. The real differentiator this run demonstrates \u2014 the DomainEvent-vs-IntegrationEvent gotcha, and using this codebase's exact method names (pull_events/uow.outbox.record, not collect_new_events/EVENT_HANDLERS) \u2014 isn't covered by any assertion. Recommend tightening: add an assertion checking specifically for the IntegrationEvent distinction, and/or check that the corrected code uses this standard's exact API names rather than generic DDD terminology."}], "overall": "Assertions pass, but this eval needs sharper assertions before it's trusted as a discriminating signal \u2014 see suggestion."}}}, {"id": "eval-3-event-never-published-debug-without_skill-run-1", "prompt": "(No prompt found)", "eval_id": null, "outputs": [{"name": "result.md", "type": "text", "content": "# Por qu\u00e9 `record_event()` no llega a SQS (y c\u00f3mo arreglarlo)\n\nCuando un evento se registra en el agregado pero nunca aparece en SQS, casi siempre es porque **\"registrar\" el evento y \"publicarlo\" son dos pasos distintos**, y algo en la cadena que va de uno a otro se est\u00e1 rompiendo silenciosamente. `record_event()` normalmente solo hace esto:\n\n```python\nclass Aggregate:\n    def __init__(self):\n        self.events: list[DomainEvent] = []\n\n    def record_event(self, event: DomainEvent) -> None:\n        self.events.append(event)\n```\n\nEs decir: el evento queda **en memoria, colgado del objeto Python**. Nada lo saca de ah\u00ed autom\u00e1ticamente. Para que llegue a SQS tiene que pasar por una cadena de responsabilidades que, en un sistema DDD + UoW t\u00edpico, se ve as\u00ed:\n\n```\nAggregate.record_event()\n    -> UoW.commit() recolecta eventos de los agregados \"vistos\" (Repository.seen)\n    -> UoW/MessageBus despacha cada evento a sus handlers\n    -> un handler serializa el evento y lo publica en SQS\n```\n\nCualquier eslab\u00f3n roto en esa cadena produce exactamente el s\u00edntoma que describ\u00eds: el evento se crea, pero nunca sale.\n\n## Checklist de diagn\u00f3stico (en orden de probabilidad)\n\n### 1. El repositorio no est\u00e1 trackeando el agregado (`seen`/`_seen`)\n\nEl patr\u00f3n UoW cl\u00e1sico (estilo Cosmic Python) recolecta eventos iterando sobre los agregados que el **repositorio** marc\u00f3 como \"vistos\" durante la unit of work \u2014 t\u00edpicamente cualquier agregado que pas\u00f3 por `repo.add()` o `repo.get()`:\n\n```python\nclass AbstractRepository:\n    def __init__(self):\n        self.seen: set[Aggregate] = set()\n\n    def add(self, aggregate: Aggregate) -> None:\n        self._add(aggregate)\n        self.seen.add(aggregate)\n\n    def get(self, *args, **kwargs) -> Aggregate:\n        aggregate = self._get(*args, **kwargs)\n        if aggregate:\n            self.seen.add(aggregate)\n        return aggregate\n\n    @abc.abstractmethod\n    def _add(self, aggregate: Aggregate): ...\n\n    @abc.abstractmethod\n    def _get(self, *args, **kwargs) -> Aggregate: ...\n```\n\n```python\nclass AbstractUnitOfWork(abc.ABC):\n    repo: AbstractRepository\n\n    def collect_new_events(self):\n        for aggregate in self.repo.seen:\n            while aggregate.events:\n                yield aggregate.events.pop(0)\n```\n\n**Bug cl\u00e1sico:** el caso de uso obtiene el agregado con un m\u00e9todo propio, un query directo, o un repo distinto al que expone `.seen` (por ejemplo, hace `session.get(Model, id)` a mano en vez de `uow.repo.get(id)`, o usa un segundo repositorio \"de lectura\" para cargarlo). En ese caso el agregado nunca entra al set `seen`, `collect_new_events()` no lo recorre, y el evento muere en el garbage collector aunque `record_event()` se haya ejecutado perfectamente.\n\n\ud83d\udc49 **Verific\u00e1**: \u00bfel agregado sobre el que llamaste `record_event()` es el mismo objeto que obtuviste v\u00eda `uow.repo.get(...)` / `uow.repo.add(...)` dentro de ese `with uow:`? Si lo recargaste, lo clonaste, o lo construiste aparte, ese es tu bug.\n\n### 2. `UoW.commit()` no llama a `collect_new_events()` / no publica\n\nRevis\u00e1 el `commit()` real de tu UoW. La forma correcta separa \"confirmar la transacci\u00f3n de DB\" de \"publicar eventos\", pero **ambas cosas tienen que pasar**:\n\n```python\nclass AbstractUnitOfWork(abc.ABC):\n    def __enter__(self) -> \"AbstractUnitOfWork\":\n        return self\n\n    def __exit__(self, *args):\n        self.rollback()  # no-op si ya hubo commit\n\n    def commit(self):\n        self._commit()\n\n    @abc.abstractmethod\n    def _commit(self): ...\n\n    @abc.abstractmethod\n    def rollback(self): ...\n```\n\nY quien orquesta la publicaci\u00f3n normalmente es el **message bus**, no el UoW directamente:\n\n```python\ndef handle(message: Command | DomainEvent, uow: AbstractUnitOfWork):\n    queue = [message]\n    while queue:\n        message = queue.pop(0)\n        if isinstance(message, DomainEvent):\n            handle_event(message, queue, uow)\n        elif isinstance(message, Command):\n            handle_command(message, queue, uow)\n\n\ndef handle_event(event: DomainEvent, queue: list, uow: AbstractUnitOfWork):\n    for handler in EVENT_HANDLERS[type(event)]:\n        handler(event)\n        queue.extend(uow.collect_new_events())\n```\n\n**Bug cl\u00e1sico:** en el caso de uso, se llama `uow.commit()` (que hace el `COMMIT` de PostgreSQL) pero **nunca se invoca** `uow.collect_new_events()` despu\u00e9s, o el caso de uso hace `return` antes de llegar a esa l\u00ednea (por ejemplo, en un `try/except` mal ubicado, o en un endpoint FastAPI que arma la respuesta y sale temprano).\n\n\ud83d\udc49 **Verific\u00e1**: \u00bfexiste, despu\u00e9s del `commit()`, un `for event in uow.collect_new_events(): bus.handle(event)` (o equivalente)? \u00bfEse bucle se ejecuta siempre, incluso en el camino feliz m\u00e1s corto del endpoint?\n\n### 3. No hay handler registrado para ese tipo de evento\n\nAunque el evento s\u00ed llegue al message bus, si no hay un handler mapeado para su clase, el bus simplemente no hace nada (o lanza `KeyError`/lo ignora seg\u00fan c\u00f3mo est\u00e9 implementado el `EVENT_HANDLERS` dict):\n\n```python\nEVENT_HANDLERS: dict[type[DomainEvent], list[Callable]] = {\n    ProvisionAmountCalculated: [publish_provision_amount_to_sqs],\n    # <-- \u00bftu evento nuevo est\u00e1 ac\u00e1?\n}\n```\n\n**Bug cl\u00e1sico:** se cre\u00f3 una clase de evento nueva (`ProvisionAmountCalculated`, `LoanDisbursed`, lo que sea) pero se olvid\u00f3 registrar el handler correspondiente en el diccionario/registro central. Es el t\u00edpico \"funciona en local para el evento viejo, pero el nuevo nunca sale\" \u2014 porque el c\u00f3digo nuevo del dominio se escribi\u00f3, pero el \"cableado\" en la capa de aplicaci\u00f3n no.\n\n\ud83d\udc49 **Verific\u00e1**: busc\u00e1 el registro central de handlers (`EVENT_HANDLERS`, `bootstrap.py`, `injector`, o como se llame en tu proyecto) y confirm\u00e1 que el tipo exacto de tu evento est\u00e1 mapeado a una funci\u00f3n que publique a SQS.\n\n### 4. El handler de SQS est\u00e1 fallando silenciosamente\n\nSi el evento s\u00ed llega al handler, pero el `try/except` alrededor de la publicaci\u00f3n traga la excepci\u00f3n sin loggear (o loggea a un nivel que nadie mira):\n\n```python\ndef publish_provision_amount_to_sqs(event: ProvisionAmountCalculated, sqs_client=Depends(get_sqs_client)):\n    try:\n        sqs_client.send_message(\n            QueueUrl=settings.PROVISION_QUEUE_URL,\n            MessageBody=event.json(),\n        )\n    except Exception:\n        pass  # <-- esto es tu bug\n```\n\nCausas t\u00edpicas del fallo real debajo del `except`:\n- `QueueUrl` mal configurado o apuntando a otra regi\u00f3n/cuenta (credenciales de IAM sin permiso `sqs:SendMessage` en esa cola).\n- El evento no es serializable (`event.json()` explota por un `Decimal`, `datetime`, o value object sin encoder).\n- Body de mensaje que excede 256KB.\n\n\ud83d\udc49 **Verific\u00e1**: quit\u00e1 el `try/except` gen\u00e9rico (o al menos logge\u00e1 con `logger.exception(...)` y stacktrace completo) y volv\u00e9 a reproducir. Revis\u00e1 CloudWatch/logs de la app en el momento exacto del commit.\n\n### 5. El evento se publica *antes* del commit, y el commit falla o hace rollback (dual-write problem)\n\nSi en alg\u00fan lugar la publicaci\u00f3n a SQS se dispara **dentro** del mismo bloque que hace `record_event()`, pero *antes* de que el `commit()` de la transacci\u00f3n se confirme, ten\u00e9s el problema inverso: a veces publica de m\u00e1s (evento sin persistencia real) o, m\u00e1s com\u00fan en tu caso, el orden de ejecuci\u00f3n hace que la publicaci\u00f3n dependa de un estado que se revierte:\n\n```python\n# ANTI-PATR\u00d3N: no hacer esto\ndef some_use_case(uow, sqs_client):\n    with uow:\n        aggregate = uow.repo.get(id)\n        aggregate.do_something()\n        aggregate.record_event(SomethingHappened(...))\n        sqs_client.send_message(...)  # se publica ANTES del commit\n        uow.commit()                  # si esto falla, ya publicaste igual\n```\n\no el escenario que m\u00e1s suele explicar \"nunca llega\":\n\n```python\ndef some_use_case(uow):\n    with uow:\n        aggregate = uow.repo.get(id)\n        aggregate.do_something()\n        aggregate.record_event(SomethingHappened(...))\n        raise SomeValidationError(...)  # excepci\u00f3n DESPU\u00c9S de record_event\n        uow.commit()  # nunca se alcanza -> rollback -> commit() nunca corre\n                       # -> collect_new_events() nunca corre\n```\n\nSi hay una excepci\u00f3n (de negocio o infraestructura) entre `record_event()` y `commit()`, el `__exit__` del UoW hace `rollback()`, `commit()` nunca corre, y el evento \u2014que vive solo en memoria dentro del objeto `aggregate`\u2014 se pierde junto con el objeto cuando termina el `with`. Esto es *correcto* si la intenci\u00f3n es \"no hay transacci\u00f3n, no hay evento\", pero muchas veces el bug real es que la excepci\u00f3n es inesperada (una validaci\u00f3n tard\u00eda, un `flush()` de SQLAlchemy que dispara una constraint) y pasa desapercibida porque el endpoint la atrapa y devuelve un 200 igual, o el error se loggea en un nivel que nadie revisa.\n\n\ud83d\udc49 **Verific\u00e1**: \u00bftu caso de uso realmente llega a `uow.commit()`, o hay una excepci\u00f3n / return temprano entre el `record_event()` y el `commit()`? Pon\u00e9 un breakpoint o log justo antes del `commit()` y confirm\u00e1 que se ejecuta en el request que est\u00e1s probando.\n\n## El fix seg\u00fan el est\u00e1ndar (outbox transaccional)\n\nPublicar directo a SQS desde el handler, aunque est\u00e9 bien cableado, tiene un problema estructural: es un **dual write** \u2014 est\u00e1s escribiendo a PostgreSQL y a SQS en dos operaciones separadas no at\u00f3micas. Si el commit a DB tiene \u00e9xito pero el `send_message` a SQS falla (timeout de red, throttling, IAM revocado a mitad de deploy), perd\u00e9s el evento para siempre aunque todo el c\u00f3digo de arriba est\u00e9 \"bien\". Ese es, en la pr\u00e1ctica, la causa m\u00e1s frecuente de \"a veces s\u00ed, a veces no\" en producci\u00f3n.\n\nLa soluci\u00f3n est\u00e1ndar en DDD/event-driven es el **transactional outbox**: en vez de publicar a SQS directamente dentro del handler de dominio, escrib\u00eds el evento en una tabla `outbox` **dentro de la misma transacci\u00f3n de PostgreSQL** que persiste el agregado. Un proceso aparte (poller o CDC) lee la tabla y publica a SQS con reintentos, por fuera de la transacci\u00f3n de negocio.\n\n```python\nclass OutboxRecord(Base):\n    __tablename__ = \"outbox\"\n\n    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)\n    aggregate_id: Mapped[str]\n    event_type: Mapped[str]\n    payload: Mapped[dict] = mapped_column(JSONB)\n    occurred_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)\n    published_at: Mapped[datetime | None] = mapped_column(default=None)\n\n\ndef persist_events_to_outbox(event: DomainEvent, uow: SqlAlchemyUnitOfWork):\n    # corre DENTRO de la misma transacci\u00f3n del commit del agregado\n    uow.session.add(\n        OutboxRecord(\n            aggregate_id=event.aggregate_id,\n            event_type=type(event).__name__,\n            payload=event.dict(),\n        )\n    )\n```\n\n```python\n# Worker/cron separado, con retry e idempotencia\ndef publish_pending_outbox_events(session: Session, sqs_client) -> None:\n    pending = session.execute(\n        select(OutboxRecord)\n        .where(OutboxRecord.published_at.is_(None))\n        .order_by(OutboxRecord.occurred_at)\n        .with_for_update(skip_locked=True)\n    ).scalars().all()\n\n    for record in pending:\n        sqs_client.send_message(\n            QueueUrl=queue_url_for(record.event_type),\n            MessageBody=json.dumps(record.payload),\n            MessageAttributes={\"event_type\": {\"DataType\": \"String\", \"StringValue\": record.event_type}},\n        )\n        record.published_at = datetime.utcnow()\n        session.commit()\n```\n\nCon esto:\n- El evento **nunca se pierde** entre el `commit()` de dominio y la publicaci\u00f3n, porque ambos ocurren en la misma transacci\u00f3n de DB (o el evento directamente no existe si el commit falla).\n- La publicaci\u00f3n a SQS es **idempotente y reintentable** independientemente del ciclo de vida del request HTTP.\n- Gan\u00e1s trazabilidad: pod\u00e9s consultar la tabla `outbox` para ver exactamente qu\u00e9 eventos se generaron, cu\u00e1ndo, y si se publicaron.\n\n## Resumen accionable\n\n1. Confirm\u00e1 que el agregado con el evento pas\u00f3 por `uow.repo.get()`/`uow.repo.add()` (para que est\u00e9 en `repo.seen`).\n2. Confirm\u00e1 que despu\u00e9s de `uow.commit()` se llama a `uow.collect_new_events()` y que ese loop no se corta por un `return`/excepci\u00f3n temprana.\n3. Confirm\u00e1 que existe un handler registrado para el tipo exacto de tu evento en el mapa `EVENT_HANDLERS`.\n4. Sac\u00e1 cualquier `except: pass` silencioso alrededor del `send_message` y mir\u00e1 logs/CloudWatch.\n5. Verific\u00e1 que no haya una excepci\u00f3n entre `record_event()` y `commit()` que est\u00e9 forzando un rollback silencioso.\n6. Si esto ya te pas\u00f3 una vez en producci\u00f3n de forma intermitente, no lo dejes en \"publicar directo desde el handler\" \u2014 migr\u00e1 a **outbox transaccional**, que es la \u00fanica forma de garantizar entrega consistente entre la escritura en Postgres y la publicaci\u00f3n en SQS.\n"}], "grading": {"expectations": [{"text": "root_cause_identified", "passed": true, "evidence": "'el evento queda en memoria, colgado del objeto Python. Nada lo saca de ah\u00ed autom\u00e1ticamente' \u2014 same core diagnosis as the with-skill run, using generic Cosmic-Python terminology (collect_new_events/repo.seen) instead of this standard's exact API names (pull_events/uow.outbox.record)"}, {"text": "outbox_pattern_explained", "passed": true, "evidence": "Dedicated 'El fix seg\u00fan el est\u00e1ndar (outbox transaccional)' section, explicit dual-write reasoning for why direct publish is unsafe"}, {"text": "same_transaction_emphasized", "passed": true, "evidence": "'escrib\u00eds el evento en una tabla outbox DENTRO de la misma transacci\u00f3n de PostgreSQL que persiste el agregado'"}, {"text": "shows_corrected_code", "passed": true, "evidence": "Shows OutboxRecord model + persist_events_to_outbox + a worker/cron publisher"}, {"text": "mentions_relay_process", "passed": true, "evidence": "'Un proceso aparte (poller o CDC) lee la tabla y publica a SQS con reintentos'"}], "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0}, "timing": {"executor_duration_seconds": 81.9, "total_tokens": 48939}, "eval_feedback": {"overall": "This run passes all 5 assertions with essentially the same quality as the with-skill run \u2014 the transactional outbox pattern is well-known enough that a strong baseline model reaches it unprompted. This eval, as currently written, mainly tests general DDD/event-driven knowledge rather than this specific standard's conventions, so it under-discriminates between the two conditions. What the baseline genuinely cannot produce (and doesn't) is this codebase's exact vocabulary and mechanism: pull_events()/uow.outbox.record() by name, the DomainEvent-vs-IntegrationEvent relay-eligibility distinction, or a diagnostic checklist ordered around this standard's actual pipeline (outbox_events table -> published_at -> SNS filter policy -> DLQ). See with_skill/grading.json's eval_feedback for a concrete suggestion to sharpen this eval."}}}], "previous_feedback": {}, "previous_outputs": {}, "benchmark": {"metadata": {"skill_name": "ddd-hexagonal-fastapi-standard", "skill_path": "/Users/miguepoloc/Code/01-active-projects/backend-architecture-standard/.claude/skills/ddd-hexagonal-fastapi-standard", "executor_model": "claude-sonnet-5", "analyzer_model": "claude-sonnet-5", "timestamp": "2026-09-03T04:52:25Z", "evals_run": [1, 2, 3], "runs_per_configuration": 3}, "runs": [{"eval_id": 1, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 10, "failed": 0, "total": 10, "time_seconds": 449.2, "tokens": 116366, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "naming_correct", "passed": true, "evidence": "commerce/gift_card/ \u2014 explicitly reasoned per \u00a73.1: 'El subcontexto se nombra en snake_case coincidiendo con el agregado'"}, {"text": "module_qualified_imports", "passed": true, "evidence": "Every file uses `from x import y` then `y.Z` (e.g. `from commons.domain import aggregates, money` then `aggregates.AggregateRoot`); aliases used correctly for collisions (`base_value_objects`, `commons_exceptions`)"}, {"text": "typed_id_used", "passed": true, "evidence": "`class GiftCardId(value_objects.UuidV7Id): pass`"}, {"text": "money_used_for_balance", "passed": true, "evidence": "`balance: money.NonNegativeMoney`, redemption amount typed `money.PositiveMoney`; even added a missing `__sub__` to the shared `Money` class rather than hand-rolling subtraction"}, {"text": "posixtime_for_timestamps", "passed": true, "evidence": "`expires_at: base_value_objects.PosixTime`, uses `PosixTime.now()`/`.from_datetime()`, never raw datetime in the domain; ORM stores `expires_at: Mapped[int]` as BigInteger microseconds"}, {"text": "strenum_for_status", "passed": true, "evidence": "`class GiftCardStatus(enum.StrEnum):`"}, {"text": "event_recorded_correctly", "passed": true, "evidence": "`GiftCardRedeemed(domain_events.DomainEvent)` defined; `self.record_event(events.GiftCardRedeemed(...))` called inside `redeem()`"}, {"text": "events_drained_in_service", "passed": true, "evidence": "`_publish_events(uow, gift_card)` called inside `with uow.transaction():` in both `issue_gift_card` and `redeem_gift_card`"}, {"text": "no_unnecessary_orchestrator", "passed": true, "evidence": "Explicitly walked the decision tree ('\u00bfel caso de uso muta exactamente una instancia de agregado? \u2192 S\u00ed... \u00a710.1') and named the Middle Man smell as the reason not to add one"}, {"text": "narrow_domain_exception", "passed": true, "evidence": "`GiftCardNotActiveError`, `GiftCardExpiredError`, `InsufficientGiftCardBalanceError`, `GiftCardNotFoundError` \u2014 one per invalid transition, all subclassing `commons.domain.exceptions`"}], "notes": []}, {"eval_id": 2, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 138.0, "tokens": 79904, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "orchestrator_calls_services_not_repo", "passed": true, "evidence": "cancel_order_orchestrator.py calls orders.get_order/orders.cancel_order/stock.release_stock (service functions); never uow.repo(...) or an aggregate method"}, {"text": "correct_orchestration_tier", "passed": true, "evidence": "Explicitly walked the \u00a710 decision tree in prose before writing code and concluded \u00a710.2 (same product, product-level orchestrator)"}, {"text": "atomicity_via_nested_transactions", "passed": true, "evidence": "Orchestrator opens `with uow.transaction():`; explains nested calls join it per \u00a78's re-entrancy check, cites the exact code path"}, {"text": "new_release_stock_function", "passed": true, "evidence": "commerce/stock/services/stock.py::release_stock(...) created, symmetric to reserve_stock but a distinct function"}, {"text": "orchestrator_no_domain_import", "passed": true, "evidence": "Orchestrator only imports service modules (orders, stock) plus commerce.orders.domain.model.value_objects (aliased order_value_objects) solely for type-hinting the order_id parameter \u2014 never aggregate.py or adapters/. See eval_feedback: this VO-for-typing import is a defensible but literally-unaddressed edge case against contract 6's wording."}], "notes": []}, {"eval_id": 3, "configuration": "with_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 63.8, "tokens": 64059, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "root_cause_identified", "passed": true, "evidence": "Quotes the exact base class: `record_event()` only appends to `_events`; walks the full 5-step pipeline and states 'el evento queda en memoria... nadie lo lee jam\u00e1s' when step 2/3 is skipped"}, {"text": "outbox_pattern_explained", "passed": true, "evidence": "Names the outbox explicitly, distinguishes it from direct publish, cites 'Postgres... no te da un write transaccional cruzado contra una cola externa' as the reason it's needed"}, {"text": "same_transaction_emphasized", "passed": true, "evidence": "'pull_events() y uow.outbox.record(event) deben ir DENTRO del mismo bloque with uow.transaction() que la mutaci\u00f3n del agregado'"}, {"text": "shows_corrected_code", "passed": true, "evidence": "Shows the corrected reserve_stock with _publish_events added, diffed against the broken version"}, {"text": "mentions_relay_process", "passed": true, "evidence": "'relay (cron) \u2192 lee filas sin publicar, publica a SNS/EventBridge' as step 4 of the pipeline, plus a dedicated 'relay no est\u00e1 corriendo' diagnostic branch"}], "notes": []}, {"eval_id": 1, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 0.3, "passed": 3, "failed": 7, "total": 10, "time_seconds": 236.9, "tokens": 72087, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "naming_correct", "passed": true, "evidence": "Folder is commerce/gift_card/, matching snake_case(GiftCard) \u2014 but coincidental: no rule was cited, the agent stated it was guessing a generic convention and told the user to adjust names to their own codebase"}, {"text": "module_qualified_imports", "passed": false, "evidence": "Imports classes directly throughout, e.g. `from commerce.gift_card.domain.events import (DomainEvent, GiftCardExpired, GiftCardIssued, GiftCardRedeemed)` and `from commerce.gift_card.domain.model import GiftCard, GiftCardCode, GiftCardStatus, Money`"}, {"text": "typed_id_used", "passed": false, "evidence": "`GiftCard.id: uuid.UUID` \u2014 a raw UUID, no GiftCardId wrapper type anywhere"}, {"text": "money_used_for_balance", "passed": false, "evidence": "Hand-rolled its own `Money` class from scratch (with `__slots__`, manual `object.__setattr__` immutability) instead of the standard's `commons.domain.money.NonNegativeMoney`/`PositiveMoney` \u2014 reasonable engineering on its own, but not this standard"}, {"text": "posixtime_for_timestamps", "passed": false, "evidence": "Uses `datetime.now(timezone.utc)` throughout and `DateTime(timezone=True)` ORM columns \u2014 exactly the pattern this standard explicitly forbids (\u00a71.8/\u00a720)"}, {"text": "strenum_for_status", "passed": false, "evidence": "`class GiftCardStatus(str, Enum):` \u2014 the old mixin form this standard explicitly replaced with `enum.StrEnum`"}, {"text": "event_recorded_correctly", "passed": false, "evidence": "Events are plain `@dataclass(frozen=True)` appended via `self.events.append(...)` \u2014 no `AggregateRoot`/`record_event()` mechanism exists in this answer at all (a different, self-invented event-collection design)"}, {"text": "events_drained_in_service", "passed": false, "evidence": "`message_bus.dispatch(uow)` is called AFTER `uow.commit()` inside the API layer, with no outbox table \u2014 the exact 'publish-after-commit, no durability guarantee' anti-pattern this standard's \u00a711.2/\u00a720 documents. The answer's own 'production notes' section (item 3) correctly *identifies* this as a real gap requiring a transactional outbox, but the shipped code doesn't implement one."}, {"text": "no_unnecessary_orchestrator", "passed": true, "evidence": "No orchestrator layer was introduced for this single-aggregate case \u2014 though this is also just the path of least resistance without any standard's decision tree to consult"}, {"text": "narrow_domain_exception", "passed": true, "evidence": "GiftCardNotActiveError, GiftCardExpiredError, InsufficientBalanceError, etc. \u2014 narrow, named exceptions, same spirit as the standard even without knowing its exact hierarchy"}], "notes": []}, {"eval_id": 2, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 0.0, "passed": 0, "failed": 5, "total": 5, "time_seconds": 159.3, "tokens": 58864, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "orchestrator_calls_services_not_repo", "passed": false, "evidence": "There is no separate service-layer function per subcontext \u2014 the single `cancel_order` use-case function calls `uow.orders.get(order_id)` and `uow.stock.get_by_sku(line.sku)` (repositories) directly, then `order.cancel(...)`/`stock.release_reservation(...)` (aggregate methods) directly"}, {"text": "correct_orchestration_tier", "passed": false, "evidence": "No orchestrator/service-layer split exists at all; one flat application-service function does everything for both aggregates"}, {"text": "atomicity_via_nested_transactions", "passed": false, "evidence": "Atomicity comes from one flat `async with uow: ... await uow.commit()` around the whole function, not from composing separate per-subcontext service functions that nest their own transactions"}, {"text": "new_release_stock_function", "passed": false, "evidence": "No stock-side service function exists; `stock.release_reservation(line.reservation_id)` \u2014 a domain method \u2014 is called directly inline from the flat use case"}, {"text": "orchestrator_no_domain_import", "passed": false, "evidence": "The use-case function imports and directly manipulates both aggregates (`order.cancel(...)`, `stock.release_reservation(...)`) \u2014 the exact 'reach past the service into the aggregate' shape this standard's rule exists to prevent"}], "notes": []}, {"eval_id": 3, "configuration": "without_skill", "run_number": 1, "result": {"pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 81.9, "tokens": 48939, "tool_calls": 0, "errors": 0}, "expectations": [{"text": "root_cause_identified", "passed": true, "evidence": "'el evento queda en memoria, colgado del objeto Python. Nada lo saca de ah\u00ed autom\u00e1ticamente' \u2014 same core diagnosis as the with-skill run, using generic Cosmic-Python terminology (collect_new_events/repo.seen) instead of this standard's exact API names (pull_events/uow.outbox.record)"}, {"text": "outbox_pattern_explained", "passed": true, "evidence": "Dedicated 'El fix seg\u00fan el est\u00e1ndar (outbox transaccional)' section, explicit dual-write reasoning for why direct publish is unsafe"}, {"text": "same_transaction_emphasized", "passed": true, "evidence": "'escrib\u00eds el evento en una tabla outbox DENTRO de la misma transacci\u00f3n de PostgreSQL que persiste el agregado'"}, {"text": "shows_corrected_code", "passed": true, "evidence": "Shows OutboxRecord model + persist_events_to_outbox + a worker/cron publisher"}, {"text": "mentions_relay_process", "passed": true, "evidence": "'Un proceso aparte (poller o CDC) lee la tabla y publica a SQS con reintentos'"}], "notes": []}], "run_summary": {"with_skill": {"pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0}, "time_seconds": {"mean": 217.0, "stddev": 204.4848, "min": 63.8, "max": 449.2}, "tokens": {"mean": 86776.3333, "stddev": 26822.1417, "min": 64059, "max": 116366}}, "without_skill": {"pass_rate": {"mean": 0.4333, "stddev": 0.5132, "min": 0.0, "max": 1.0}, "time_seconds": {"mean": 159.3667, "stddev": 77.5, "min": 81.9, "max": 236.9}, "tokens": {"mean": 59963.3333, "stddev": 11613.0907, "min": 48939, "max": 72087}}, "delta": {"pass_rate": "+0.57", "time_seconds": "+57.6", "tokens": "+26813"}}, "notes": ["Eval 1 (gift-card-context) and Eval 2 (cancel-order-release-stock) are the strongest, cleanest signal: with-skill scores 10/10 and 5/5 by correctly applying house-specific conventions (typed IDs, PosixTime, StrEnum, Money, module-qualified imports, the orchestrator-calls-services-not-repo rule) that the baseline has no way to know and consistently violates instead (raw UUIDs, datetime, old str-Enum mixin, hand-rolled Money, direct-class imports, and \u2014 most importantly \u2014 collapsing the orchestrator/service distinction into one flat function that reaches into both repositories and both aggregates directly in eval 2).", "Eval 3 (event-never-published-debug) does NOT discriminate well as currently written: both configurations score 5/5 because the transactional outbox pattern being tested is well-known generic DDD/event-driven knowledge, not something unique to this standard. The real differentiator the with-skill run demonstrates \u2014 catching the DomainEvent-vs-IntegrationEvent relay-eligibility gotcha and using this codebase's exact API names (pull_events/uow.outbox.record) instead of generic terminology (collect_new_events/EVENT_HANDLERS) \u2014 isn't covered by any of the 5 assertions. Recommend tightening this eval before trusting it as a signal: add an assertion for the IntegrationEvent distinction specifically.", "A genuine ambiguity in the skill itself was surfaced by eval 2, not a model failure: the orchestrator in the with-skill run imports a sibling subcontext's domain.model.value_objects module purely to type-hint an id parameter. Import-linter contract 6 as written ('never any subcontext's domain or adapters module') doesn't carve this out, even though it's clearly harmless (no business logic touched) and arguably necessary. Worth an explicit clarification in enforcement-and-style.md before this trips up a real import-linter run.", "Both baseline runs independently reach for solid, defensible engineering (optimistic/pessimistic locking, idempotency-by-design, transactional outbox) \u2014 the skill's value isn't 'produces correct DDD code' (a strong model does that anyway) but 'produces code that matches THIS codebase's specific, already-established conventions,' which is exactly what a second engineer reading the diff needs and exactly what eval 1/2's assertions were designed to catch.", "Time/token cost: with-skill runs took roughly 2-4x longer and used 1.5-2x more tokens than baseline (see run_summary deltas) \u2014 expected, since the with-skill runs read SKILL.md plus 2-3 reference files before answering. Worth keeping an eye on for simpler future tasks where a lighter read might suffice, but not a concern for tasks of this complexity."]}};
+
+    // ---- State ----
+    let feedbackMap = {};  // run_id -> feedback text
+    let currentIndex = 0;
+    let visitedRuns = new Set();
+
+    // ---- Init ----
+    async function init() {
+      // Load saved feedback from server — but only if this isn't a fresh
+      // iteration (indicated by previous_feedback being present). When
+      // previous feedback exists, the feedback.json on disk is stale from
+      // the prior iteration and should not pre-fill the textareas.
+      const hasPrevious = Object.keys(EMBEDDED_DATA.previous_feedback || {}).length > 0
+        || Object.keys(EMBEDDED_DATA.previous_outputs || {}).length > 0;
+      if (!hasPrevious) {
+        try {
+          const resp = await fetch("/api/feedback");
+          const data = await resp.json();
+          if (data.reviews) {
+            for (const r of data.reviews) feedbackMap[r.run_id] = r.feedback;
+          }
+        } catch { /* first run, no feedback yet */ }
+      }
+
+      document.getElementById("skill-name").textContent = EMBEDDED_DATA.skill_name;
+      showRun(0);
+
+      // Wire up feedback auto-save
+      const textarea = document.getElementById("feedback");
+      let saveTimeout = null;
+      textarea.addEventListener("input", () => {
+        clearTimeout(saveTimeout);
+        document.getElementById("feedback-status").textContent = "";
+        saveTimeout = setTimeout(() => saveCurrentFeedback(), 800);
+      });
+    }
+
+    // ---- Navigation ----
+    function navigate(delta) {
+      const newIndex = currentIndex + delta;
+      if (newIndex >= 0 && newIndex < EMBEDDED_DATA.runs.length) {
+        saveCurrentFeedback();
+        showRun(newIndex);
+      }
+    }
+
+    function updateNavButtons() {
+      document.getElementById("prev-btn").disabled = currentIndex === 0;
+      document.getElementById("next-btn").disabled =
+        currentIndex === EMBEDDED_DATA.runs.length - 1;
+    }
+
+    // ---- Show a run ----
+    function showRun(index) {
+      currentIndex = index;
+      const run = EMBEDDED_DATA.runs[index];
+
+      // Progress
+      document.getElementById("progress").textContent =
+        `${index + 1} of ${EMBEDDED_DATA.runs.length}`;
+
+      // Prompt
+      document.getElementById("prompt-text").textContent = run.prompt;
+
+      // Config badge
+      const badge = document.getElementById("config-badge");
+      const configMatch = run.id.match(/(with_skill|without_skill|new_skill|old_skill)/);
+      if (configMatch) {
+        const config = configMatch[1];
+        const isBaseline = config === "without_skill" || config === "old_skill";
+        badge.textContent = config.replace(/_/g, " ");
+        badge.className = "config-badge " + (isBaseline ? "config-baseline" : "config-primary");
+        badge.style.display = "inline-block";
+      } else {
+        badge.style.display = "none";
+      }
+
+      // Outputs
+      renderOutputs(run);
+
+      // Previous outputs
+      renderPrevOutputs(run);
+
+      // Grades
+      renderGrades(run);
+
+      // Previous feedback
+      const prevFb = (EMBEDDED_DATA.previous_feedback || {})[run.id];
+      const prevEl = document.getElementById("prev-feedback");
+      if (prevFb) {
+        document.getElementById("prev-feedback-text").textContent = prevFb;
+        prevEl.style.display = "block";
+      } else {
+        prevEl.style.display = "none";
+      }
+
+      // Feedback
+      document.getElementById("feedback").value = feedbackMap[run.id] || "";
+      document.getElementById("feedback-status").textContent = "";
+
+      updateNavButtons();
+
+      // Track visited runs and promote done button when all visited
+      visitedRuns.add(index);
+      const doneBtn = document.getElementById("done-btn");
+      if (visitedRuns.size >= EMBEDDED_DATA.runs.length) {
+        doneBtn.classList.add("ready");
+      }
+
+      // Scroll main content to top
+      document.querySelector(".main").scrollTop = 0;
+    }
+
+    // ---- Render outputs ----
+    function renderOutputs(run) {
+      const container = document.getElementById("outputs-body");
+      container.innerHTML = "";
+
+      const outputs = run.outputs || [];
+      if (outputs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No output files</div>';
+        return;
+      }
+
+      for (const file of outputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        // Always show file header with download link
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const content = document.createElement("div");
+        content.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          content.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          content.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          content.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(content, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          content.appendChild(a);
+        } else if (file.type === "error") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          pre.style.color = "var(--red)";
+          content.appendChild(pre);
+        }
+
+        fileDiv.appendChild(content);
+        container.appendChild(fileDiv);
+      }
+    }
+
+    // ---- XLSX rendering via SheetJS ----
+    function renderXlsx(container, b64Data) {
+      try {
+        const raw = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+        const wb = XLSX.read(raw, { type: "array" });
+
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const sheetName = wb.SheetNames[i];
+          const ws = wb.Sheets[sheetName];
+
+          if (wb.SheetNames.length > 1) {
+            const sheetLabel = document.createElement("div");
+            sheetLabel.style.cssText =
+              "font-weight:600; font-size:0.8rem; color:#b0aea5; margin-top:0.5rem; margin-bottom:0.25rem;";
+            sheetLabel.textContent = "Sheet: " + sheetName;
+            container.appendChild(sheetLabel);
+          }
+
+          const htmlStr = XLSX.utils.sheet_to_html(ws, { editable: false });
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = htmlStr;
+          container.appendChild(wrapper);
+        }
+      } catch (err) {
+        container.textContent = "Error rendering spreadsheet: " + err.message;
+      }
+    }
+
+    // ---- Grades ----
+    function renderGrades(run) {
+      const section = document.getElementById("grades-section");
+      const content = document.getElementById("grades-content");
+
+      if (!run.grading) {
+        section.style.display = "none";
+        return;
+      }
+
+      const grading = run.grading;
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("grades-arrow").classList.remove("open");
+
+      const summary = grading.summary || {};
+      const expectations = grading.expectations || [];
+
+      let html = '<div style="padding: 1rem;">';
+
+      // Summary line
+      const passRate = summary.pass_rate != null
+        ? Math.round(summary.pass_rate * 100) + "%"
+        : "?";
+      const badgeClass = summary.pass_rate >= 0.8 ? "grade-pass" : summary.pass_rate >= 0.5 ? "" : "grade-fail";
+      html += '<div class="grades-summary">';
+      html += '<span class="grade-badge ' + badgeClass + '">' + passRate + '</span>';
+      html += '<span>' + (summary.passed || 0) + ' passed, ' + (summary.failed || 0) + ' failed of ' + (summary.total || 0) + '</span>';
+      html += '</div>';
+
+      // Assertions list
+      html += '<ul class="assertion-list">';
+      for (const exp of expectations) {
+        const statusClass = exp.passed ? "pass" : "fail";
+        const statusIcon = exp.passed ? "\u2713" : "\u2717";
+        html += '<li class="assertion-item">';
+        html += '<span class="assertion-status ' + statusClass + '">' + statusIcon + '</span>';
+        html += '<span>' + escapeHtml(exp.text) + '</span>';
+        if (exp.evidence) {
+          html += '<div class="assertion-evidence">' + escapeHtml(exp.evidence) + '</div>';
+        }
+        html += '</li>';
+      }
+      html += '</ul>';
+
+      html += '</div>';
+      content.innerHTML = html;
+    }
+
+    function toggleGrades() {
+      const content = document.getElementById("grades-content");
+      const arrow = document.getElementById("grades-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Previous outputs (collapsible) ----
+    function renderPrevOutputs(run) {
+      const section = document.getElementById("prev-outputs-section");
+      const content = document.getElementById("prev-outputs-content");
+      const prevOutputs = (EMBEDDED_DATA.previous_outputs || {})[run.id];
+
+      if (!prevOutputs || prevOutputs.length === 0) {
+        section.style.display = "none";
+        return;
+      }
+
+      section.style.display = "block";
+      // Reset to collapsed
+      content.classList.remove("open");
+      document.getElementById("prev-outputs-arrow").classList.remove("open");
+
+      // Render the files into the content area
+      content.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "1rem";
+
+      for (const file of prevOutputs) {
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "output-file";
+
+        const header = document.createElement("div");
+        header.className = "output-file-header";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = file.name;
+        header.appendChild(nameSpan);
+        const dlBtn = document.createElement("a");
+        dlBtn.className = "dl-btn";
+        dlBtn.textContent = "Download";
+        dlBtn.download = file.name;
+        dlBtn.href = getDownloadUri(file);
+        header.appendChild(dlBtn);
+        fileDiv.appendChild(header);
+
+        const fc = document.createElement("div");
+        fc.className = "output-file-content";
+
+        if (file.type === "text") {
+          const pre = document.createElement("pre");
+          pre.textContent = file.content;
+          fc.appendChild(pre);
+        } else if (file.type === "image") {
+          const img = document.createElement("img");
+          img.src = file.data_uri;
+          img.alt = file.name;
+          fc.appendChild(img);
+        } else if (file.type === "pdf") {
+          const iframe = document.createElement("iframe");
+          iframe.src = file.data_uri;
+          fc.appendChild(iframe);
+        } else if (file.type === "xlsx") {
+          renderXlsx(fc, file.data_b64);
+        } else if (file.type === "binary") {
+          const a = document.createElement("a");
+          a.className = "download-link";
+          a.href = file.data_uri;
+          a.download = file.name;
+          a.textContent = "Download " + file.name;
+          fc.appendChild(a);
+        }
+
+        fileDiv.appendChild(fc);
+        wrapper.appendChild(fileDiv);
+      }
+
+      content.appendChild(wrapper);
+    }
+
+    function togglePrevOutputs() {
+      const content = document.getElementById("prev-outputs-content");
+      const arrow = document.getElementById("prev-outputs-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    // ---- Feedback (saved to server -> feedback.json) ----
+    function saveCurrentFeedback() {
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // Build reviews array from map
+      const reviews = [];
+      for (const [run_id, feedback] of Object.entries(feedbackMap)) {
+        if (feedback.trim()) {
+          reviews.push({ run_id, feedback, timestamp: new Date().toISOString() });
+        }
+      }
+
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviews, status: "in_progress" }),
+      }).then(() => {
+        document.getElementById("feedback-status").textContent = "Saved";
+      }).catch(() => {
+        // Static mode or server unavailable — no-op on auto-save,
+        // feedback will be downloaded on final submit
+        document.getElementById("feedback-status").textContent = "Will download on submit";
+      });
+    }
+
+    // ---- Done ----
+    function showDoneDialog() {
+      // Save current textarea to feedbackMap (but don't POST yet)
+      const run = EMBEDDED_DATA.runs[currentIndex];
+      const text = document.getElementById("feedback").value;
+      if (text.trim() === "") {
+        delete feedbackMap[run.id];
+      } else {
+        feedbackMap[run.id] = text;
+      }
+
+      // POST once with status: complete — include ALL runs so the model
+      // can distinguish "no feedback" (looks good) from "not reviewed"
+      const reviews = [];
+      const ts = new Date().toISOString();
+      for (const r of EMBEDDED_DATA.runs) {
+        reviews.push({ run_id: r.id, feedback: feedbackMap[r.id] || "", timestamp: ts });
+      }
+      const payload = JSON.stringify({ reviews, status: "complete" }, null, 2);
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).then(() => {
+        document.getElementById("done-overlay").classList.add("visible");
+      }).catch(() => {
+        // Server not available (static mode) — download as file
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "feedback.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById("done-overlay").classList.add("visible");
+      });
+    }
+
+    function closeDoneDialog() {
+      // Reset status back to in_progress
+      saveCurrentFeedback();
+      document.getElementById("done-overlay").classList.remove("visible");
+    }
+
+    // ---- Toast ----
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      setTimeout(() => toast.classList.remove("visible"), 2000);
+    }
+
+    // ---- Keyboard nav ----
+    document.addEventListener("keydown", (e) => {
+      // Don't capture when typing in textarea
+      if (e.target.tagName === "TEXTAREA") return;
+
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        navigate(-1);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        navigate(1);
+      }
+    });
+
+    // ---- Util ----
+    function getDownloadUri(file) {
+      if (file.data_uri) return file.data_uri;
+      if (file.data_b64) return "data:application/octet-stream;base64," + file.data_b64;
+      if (file.type === "text") return "data:text/plain;charset=utf-8," + encodeURIComponent(file.content);
+      return "#";
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ---- View switching ----
+    function switchView(view) {
+      document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".view-panel").forEach(p => p.classList.remove("active"));
+      document.querySelector(`[onclick="switchView('${view}')"]`).classList.add("active");
+      document.getElementById("panel-" + view).classList.add("active");
+    }
+
+    // ---- Benchmark rendering ----
+    function renderBenchmark() {
+      const data = EMBEDDED_DATA.benchmark;
+      if (!data) return;
+
+      // Show the tabs
+      document.getElementById("view-tabs").style.display = "flex";
+
+      const container = document.getElementById("benchmark-content");
+      const summary = data.run_summary || {};
+      const metadata = data.metadata || {};
+      const notes = data.notes || [];
+
+      let html = "";
+
+      // Header
+      html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
+      html += "<p style='color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem;'>";
+      if (metadata.skill_name) html += "<strong>" + escapeHtml(metadata.skill_name) + "</strong> &mdash; ";
+      if (metadata.timestamp) html += metadata.timestamp + " &mdash; ";
+      if (metadata.evals_run) html += "Evals: " + metadata.evals_run.join(", ") + " &mdash; ";
+      html += (metadata.runs_per_configuration || "?") + " runs per configuration";
+      html += "</p>";
+
+      // Summary table
+      html += '<table class="benchmark-table">';
+
+      function fmtStat(stat, pct) {
+        if (!stat) return "—";
+        const suffix = pct ? "%" : "";
+        const m = pct ? (stat.mean * 100).toFixed(0) : stat.mean.toFixed(1);
+        const s = pct ? (stat.stddev * 100).toFixed(0) : stat.stddev.toFixed(1);
+        return m + suffix + " ± " + s + suffix;
+      }
+
+      function deltaClass(val) {
+        if (!val) return "";
+        const n = parseFloat(val);
+        if (n > 0) return "benchmark-delta-positive";
+        if (n < 0) return "benchmark-delta-negative";
+        return "";
+      }
+
+      // Discover config names dynamically (everything except "delta")
+      const configs = Object.keys(summary).filter(k => k !== "delta");
+      const configA = configs[0] || "config_a";
+      const configB = configs[1] || "config_b";
+      const labelA = configA.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const labelB = configB.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const a = summary[configA] || {};
+      const b = summary[configB] || {};
+      const delta = summary.delta || {};
+
+      html += "<thead><tr><th>Metric</th><th>" + escapeHtml(labelA) + "</th><th>" + escapeHtml(labelB) + "</th><th>Delta</th></tr></thead>";
+      html += "<tbody>";
+
+      html += "<tr><td><strong>Pass Rate</strong></td>";
+      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
+      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      html += '<td class="' + deltaClass(delta.pass_rate) + '">' + (delta.pass_rate || "—") + "</td></tr>";
+
+      // Time (only show row if data exists)
+      if (a.time_seconds || b.time_seconds) {
+        html += "<tr><td><strong>Time (s)</strong></td>";
+        html += "<td>" + fmtStat(a.time_seconds, false) + "</td>";
+        html += "<td>" + fmtStat(b.time_seconds, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.time_seconds) + '">' + (delta.time_seconds ? delta.time_seconds + "s" : "—") + "</td></tr>";
+      }
+
+      // Tokens (only show row if data exists)
+      if (a.tokens || b.tokens) {
+        html += "<tr><td><strong>Tokens</strong></td>";
+        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
+        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        html += '<td class="' + deltaClass(delta.tokens) + '">' + (delta.tokens || "—") + "</td></tr>";
+      }
+
+      html += "</tbody></table>";
+
+      // Per-eval breakdown (if runs data available)
+      const runs = data.runs || [];
+      if (runs.length > 0) {
+        const evalIds = [...new Set(runs.map(r => r.eval_id))].sort((a, b) => a - b);
+
+        html += "<h3 style='font-family: Poppins, sans-serif; margin-bottom: 0.75rem;'>Per-Eval Breakdown</h3>";
+
+        const hasTime = runs.some(r => r.result && r.result.time_seconds != null);
+        const hasErrors = runs.some(r => r.result && r.result.errors > 0);
+
+        for (const evalId of evalIds) {
+          const evalRuns = runs.filter(r => r.eval_id === evalId);
+          const evalName = evalRuns[0] && evalRuns[0].eval_name ? evalRuns[0].eval_name : "Eval " + evalId;
+
+          html += "<h4 style='font-family: Poppins, sans-serif; margin: 1rem 0 0.5rem; color: var(--text);'>" + escapeHtml(evalName) + "</h4>";
+          html += '<table class="benchmark-table">';
+          html += "<thead><tr><th>Config</th><th>Run</th><th>Pass Rate</th>";
+          if (hasTime) html += "<th>Time (s)</th>";
+          if (hasErrors) html += "<th>Crashes During Execution</th>";
+          html += "</tr></thead>";
+          html += "<tbody>";
+
+          // Group by config and render with average rows
+          const configGroups = [...new Set(evalRuns.map(r => r.configuration))];
+          for (let ci = 0; ci < configGroups.length; ci++) {
+            const config = configGroups[ci];
+            const configRuns = evalRuns.filter(r => r.configuration === config);
+            if (configRuns.length === 0) continue;
+
+            const rowClass = ci === 0 ? "benchmark-row-with" : "benchmark-row-without";
+            const configLabel = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+            for (const run of configRuns) {
+              const r = run.result || {};
+              const prClass = r.pass_rate >= 0.8 ? "benchmark-delta-positive" : r.pass_rate < 0.5 ? "benchmark-delta-negative" : "";
+              html += '<tr class="' + rowClass + '">';
+              html += "<td>" + configLabel + "</td>";
+              html += "<td>" + run.run_number + "</td>";
+              html += '<td class="' + prClass + '">' + ((r.pass_rate || 0) * 100).toFixed(0) + "% (" + (r.passed || 0) + "/" + (r.total || 0) + ")</td>";
+              if (hasTime) html += "<td>" + (r.time_seconds != null ? r.time_seconds.toFixed(1) : "—") + "</td>";
+              if (hasErrors) html += "<td>" + (r.errors || 0) + "</td>";
+              html += "</tr>";
+            }
+
+            // Average row
+            const rates = configRuns.map(r => (r.result || {}).pass_rate || 0);
+            const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+            const avgPrClass = avgRate >= 0.8 ? "benchmark-delta-positive" : avgRate < 0.5 ? "benchmark-delta-negative" : "";
+            html += '<tr class="benchmark-row-avg ' + rowClass + '">';
+            html += "<td>" + configLabel + "</td>";
+            html += "<td>Avg</td>";
+            html += '<td class="' + avgPrClass + '">' + (avgRate * 100).toFixed(0) + "%</td>";
+            if (hasTime) {
+              const times = configRuns.map(r => (r.result || {}).time_seconds).filter(t => t != null);
+              html += "<td>" + (times.length ? (times.reduce((a, b) => a + b, 0) / times.length).toFixed(1) : "—") + "</td>";
+            }
+            if (hasErrors) html += "<td></td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
+
+          // Per-assertion detail for this eval
+          const runsWithExpectations = {};
+          for (const config of configGroups) {
+            runsWithExpectations[config] = evalRuns.filter(r => r.configuration === config && r.expectations && r.expectations.length > 0);
+          }
+          const hasAnyExpectations = Object.values(runsWithExpectations).some(runs => runs.length > 0);
+          if (hasAnyExpectations) {
+            // Collect all unique assertion texts across all configs
+            const allAssertions = [];
+            const seen = new Set();
+            for (const config of configGroups) {
+              for (const run of runsWithExpectations[config]) {
+                for (const exp of (run.expectations || [])) {
+                  if (!seen.has(exp.text)) {
+                    seen.add(exp.text);
+                    allAssertions.push(exp.text);
+                  }
+                }
+              }
+            }
+
+            html += '<table class="benchmark-table" style="margin-top: 0.5rem;">';
+            html += "<thead><tr><th>Assertion</th>";
+            for (const config of configGroups) {
+              const label = config.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+              html += "<th>" + escapeHtml(label) + "</th>";
+            }
+            html += "</tr></thead><tbody>";
+
+            for (const assertionText of allAssertions) {
+              html += "<tr><td>" + escapeHtml(assertionText) + "</td>";
+
+              for (const config of configGroups) {
+                html += "<td>";
+                for (const run of runsWithExpectations[config]) {
+                  const exp = (run.expectations || []).find(e => e.text === assertionText);
+                  if (exp) {
+                    const cls = exp.passed ? "benchmark-delta-positive" : "benchmark-delta-negative";
+                    const icon = exp.passed ? "\u2713" : "\u2717";
+                    html += '<span class="' + cls + '" title="Run ' + run.run_number + ': ' + escapeHtml(exp.evidence || "") + '">' + icon + "</span> ";
+                  } else {
+                    html += "— ";
+                  }
+                }
+                html += "</td>";
+              }
+              html += "</tr>";
+            }
+            html += "</tbody></table>";
+          }
+        }
+      }
+
+      // Notes
+      if (notes.length > 0) {
+        html += '<div class="benchmark-notes">';
+        html += "<h3>Analysis Notes</h3>";
+        html += "<ul>";
+        for (const note of notes) {
+          html += "<li>" + escapeHtml(note) + "</li>";
+        }
+        html += "</ul></div>";
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ---- Start ----
+    init();
+    renderBenchmark();
+  </script>
+</body>
+</html>

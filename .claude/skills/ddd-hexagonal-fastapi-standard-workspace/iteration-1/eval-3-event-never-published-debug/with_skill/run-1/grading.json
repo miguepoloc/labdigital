@@ -1,0 +1,20 @@
+{
+  "expectations": [
+    {"text": "root_cause_identified", "passed": true, "evidence": "Quotes the exact base class: `record_event()` only appends to `_events`; walks the full 5-step pipeline and states 'el evento queda en memoria... nadie lo lee jamás' when step 2/3 is skipped"},
+    {"text": "outbox_pattern_explained", "passed": true, "evidence": "Names the outbox explicitly, distinguishes it from direct publish, cites 'Postgres... no te da un write transaccional cruzado contra una cola externa' as the reason it's needed"},
+    {"text": "same_transaction_emphasized", "passed": true, "evidence": "'pull_events() y uow.outbox.record(event) deben ir DENTRO del mismo bloque with uow.transaction() que la mutación del agregado'"},
+    {"text": "shows_corrected_code", "passed": true, "evidence": "Shows the corrected reserve_stock with _publish_events added, diffed against the broken version"},
+    {"text": "mentions_relay_process", "passed": true, "evidence": "'relay (cron) → lee filas sin publicar, publica a SNS/EventBridge' as step 4 of the pipeline, plus a dedicated 'relay no está corriendo' diagnostic branch"}
+  ],
+  "summary": {"passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0},
+  "timing": {"executor_duration_seconds": 63.8, "total_tokens": 64059},
+  "claims": [
+    {"claim": "A second, independent cause is that the event class extends DomainEvent instead of IntegrationEvent, so the relay silently ignores it even though it's correctly in the outbox table", "type": "quality", "verified": true, "evidence": "This is a real, correct consequence of this standard's actual event hierarchy (only IntegrationEvent subclasses are relayed) — not something a generic DDD answer could know, since it's specific to this codebase's class design"}
+  ],
+  "eval_feedback": {
+    "suggestions": [
+      {"reason": "This eval's 5 assertions all check for the transactional-outbox pattern in general terms (name it, explain same-transaction, show corrected code, mention a relay) — and the baseline (without-skill) run independently arrives at and correctly explains the exact same pattern, since it's well-known generic DDD/event-driven knowledge, not something unique to this standard. All 5 assertions pass for BOTH runs (see without_skill/grading.json), making this eval weakly discriminating as currently written. The real differentiator this run demonstrates — the DomainEvent-vs-IntegrationEvent gotcha, and using this codebase's exact method names (pull_events/uow.outbox.record, not collect_new_events/EVENT_HANDLERS) — isn't covered by any assertion. Recommend tightening: add an assertion checking specifically for the IntegrationEvent distinction, and/or check that the corrected code uses this standard's exact API names rather than generic DDD terminology."}
+    ],
+    "overall": "Assertions pass, but this eval needs sharper assertions before it's trusted as a discriminating signal — see suggestion."
+  }
+}
