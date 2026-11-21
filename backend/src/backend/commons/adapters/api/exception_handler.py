@@ -1,34 +1,128 @@
-"""The only place HTTP status codes get decided — ARCHITECTURE.md §13."""
+"""El único lugar donde se deciden los códigos HTTP — ARCHITECTURE.md §13.
+
+Todas las respuestas de error siguen el contrato §6:
+`{"error": {"code": "snake_case", "message": "texto en español", "details": {...}?}}`.
+"""
+
+from typing import Any
 
 import fastapi
-from fastapi import responses
+from fastapi import exceptions as fastapi_exceptions
+from fastapi import responses, status
+from starlette import exceptions as starlette_exceptions
 
+from backend.commons.adapters import logs
 from backend.commons.domain import exceptions
 
+_LOGGER = logs.get_logger()
+
 _STATUS_FOR: dict[type[exceptions.DomainError], int] = {
-    exceptions.NotFoundError: fastapi.status.HTTP_404_NOT_FOUND,
-    exceptions.ConflictError: fastapi.status.HTTP_409_CONFLICT,
-    exceptions.ValidationError: fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY,
-    exceptions.UnauthorizedError: fastapi.status.HTTP_401_UNAUTHORIZED,
-    exceptions.ForbiddenError: fastapi.status.HTTP_403_FORBIDDEN,
+    exceptions.NotFoundError: status.HTTP_404_NOT_FOUND,
+    exceptions.ConflictError: status.HTTP_409_CONFLICT,
+    exceptions.ValidationError: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    exceptions.BadRequestError: status.HTTP_400_BAD_REQUEST,
+    exceptions.UnauthorizedError: status.HTTP_401_UNAUTHORIZED,
+    exceptions.ForbiddenError: status.HTTP_403_FORBIDDEN,
+    exceptions.PayloadTooLargeError: status.HTTP_413_CONTENT_TOO_LARGE,
+    exceptions.TooManyRequestsError: status.HTTP_429_TOO_MANY_REQUESTS,
+}
+
+# Para HTTPException que levanta el propio framework (rutas inexistentes, métodos).
+_CODE_FOR_STATUS: dict[int, tuple[str, str]] = {
+    status.HTTP_400_BAD_REQUEST: ("bad_request", "Petición inválida."),
+    status.HTTP_401_UNAUTHORIZED: ("token_invalid", "Sesión no válida o caducada."),
+    status.HTTP_403_FORBIDDEN: ("forbidden", "No tienes permiso para esta acción."),
+    status.HTTP_404_NOT_FOUND: ("not_found", "Recurso no encontrado."),
+    status.HTTP_405_METHOD_NOT_ALLOWED: ("method_not_allowed", "Método no permitido."),
+    status.HTTP_413_CONTENT_TOO_LARGE: (
+        "payload_too_large",
+        "El contenido supera el tamaño permitido.",
+    ),
 }
 
 
 def status_for(error: exceptions.DomainError) -> int:
-    for error_type, status in _STATUS_FOR.items():
+    for error_type, http_status in _STATUS_FOR.items():
         if isinstance(error, error_type):
-            return status
-    return fastapi.status.HTTP_500_INTERNAL_SERVER_ERROR
+            return http_status
+    return status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+def error_response(
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    details: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> responses.JSONResponse:
+    """Construye una respuesta de error con la forma del contrato §6. Usado también por los
+    middlewares (CSRF, tamaño de cuerpo), que no pasan por los exception handlers."""
+    body: dict[str, Any] = {"code": code, "message": message}
+    if details:
+        body["details"] = details
+    return responses.JSONResponse(status_code=status_code, content={"error": body}, headers=headers)
 
 
 def install(app: fastapi.FastAPI) -> None:
-    """Call once per FastAPI app (each entrypoints/web/*.py Lambda) — ARCHITECTURE.md §9.1."""
+    """Llamar una vez por app FastAPI."""
 
     @app.exception_handler(exceptions.DomainError)
     async def _handle_domain_error(
         _request: fastapi.Request, error: exceptions.DomainError
     ) -> responses.JSONResponse:
-        return responses.JSONResponse(
-            status_code=status_for(error),
-            content={"code": error.code, "message": str(error), "details": error.details},
+        headers: dict[str, str] | None = None
+        if isinstance(error, exceptions.TooManyRequestsError):
+            headers = {"Retry-After": str(error.retry_after_seconds)}
+        http_status = status_for(error)
+        if http_status >= status.HTTP_500_INTERNAL_SERVER_ERROR:
+            _LOGGER.error("Error de dominio no mapeado: %s (%s)", error.code, error)
+        return error_response(
+            status_code=http_status,
+            code=error.code,
+            message=str(error),
+            details=dict(error.details) or None,
+            headers=headers,
+        )
+
+    @app.exception_handler(fastapi_exceptions.RequestValidationError)
+    async def _handle_validation_error(
+        _request: fastapi.Request, error: fastapi_exceptions.RequestValidationError
+    ) -> responses.JSONResponse:
+        fields = [
+            {
+                "loc": [str(part) for part in item.get("loc", ())],
+                "msg": str(item.get("msg", "")),
+                "type": str(item.get("type", "")),
+            }
+            for item in error.errors()
+        ]
+        return error_response(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            code="validation_error",
+            message="Datos inválidos.",
+            details={"fields": fields},
+        )
+
+    @app.exception_handler(starlette_exceptions.HTTPException)
+    async def _handle_http_exception(
+        _request: fastapi.Request, error: starlette_exceptions.HTTPException
+    ) -> responses.JSONResponse:
+        code, message = _CODE_FOR_STATUS.get(error.status_code, ("http_error", "Error."))
+        return error_response(
+            status_code=error.status_code,
+            code=code,
+            message=message,
+            headers=dict(error.headers) if error.headers else None,
+        )
+
+    @app.exception_handler(Exception)
+    async def _handle_unexpected(
+        _request: fastapi.Request, _error: Exception
+    ) -> responses.JSONResponse:
+        _LOGGER.exception("Error no controlado")
+        return error_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            code="internal_error",
+            message="Error interno. Inténtalo más tarde.",
         )

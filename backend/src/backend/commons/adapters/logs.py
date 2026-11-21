@@ -4,7 +4,6 @@
 import contextvars
 import json
 import logging
-import os
 import sys
 from typing import Any
 
@@ -36,7 +35,7 @@ def get_logger() -> logging.Logger:
     if _logger is None:
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(JsonFormatter())
-        _logger = logging.getLogger(os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "local"))
+        _logger = logging.getLogger("labdigital")
         _logger.propagate = False
         _logger.setLevel(logging.INFO)
         handler.setLevel(logging.INFO)

@@ -1,62 +1,105 @@
-"""Transactional Outbox — ARCHITECTURE.md §11.2. `OutboxRepository.record` is called
-inside the same `with uow.transaction():` as the aggregate write (see commons.domain
-.aggregates.AggregateRoot.pull_events + every subcontext's services/<name>.py). A separate
-relay (an EventBridge-scheduled cron entrypoint) reads unpublished rows and publishes
-IntegrationEvent rows to SNS."""
+"""Transactional Outbox — ARCHITECTURE.md §11.2. `OutboxRepository.record` se llama dentro
+del mismo `with uow.transaction():` que la escritura del agregado. El worker
+(`backend.entrypoints.worker`) usa `claim_batch`/`mark_delivered`/`mark_retry` vía
+`outbox_dispatcher.dispatch_pending`."""
 
+from typing import Any
 import uuid
 
-from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+import sqlalchemy as sa
+from sqlalchemy import orm
 
 from backend.commons.adapters import orm_base
 from backend.commons.domain import events, value_objects
 
 
+class ClaimedEvent:
+    """Copia desacoplada de la sesión de una fila reclamada (la sesión se cierra antes de
+    hacer I/O externa)."""
+
+    def __init__(
+        self, *, row_id: uuid.UUID, event_type: str, payload: dict[str, Any], attempts: int
+    ) -> None:
+        self.row_id = row_id
+        self.event_type = event_type
+        self.payload = payload
+        self.attempts = attempts
+
+
 class OutboxRepository:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: orm.Session) -> None:
         self._session = session
 
     def record(self, event: events.DomainEvent) -> None:
-        """Records every DomainEvent for audit/replay, but only IntegrationEvent rows are
-        ever relayed out (§11.1/§11.2) — the relay filters by event_type at publish time."""
+        """Registra todo DomainEvent (auditoría/reproceso); el worker sólo hace algo con los
+        tipos que tiene registrados y marca el resto como publicados sin más."""
+        now = value_objects.PosixTime.now().microseconds
         self._session.add(
             orm_base.OutboxEventOrm(
                 event_type=event.event_type,
                 payload=event.model_dump(mode="json"),
                 idempotence_key=event.idempotence_key(),
-                created_at=value_objects.PosixTime.now().microseconds,
+                created_at=now,
                 published_at=None,
+                attempts=0,
+                next_attempt_at=0,
             )
         )
 
-    def unpublished(self, *, limit: int = 100) -> list[orm_base.OutboxEventOrm]:
-        """Used by the relay cron entrypoint — see identity/entrypoints/cron and
-        commerce/entrypoints/cron for the per-product relay."""
+    def claim_batch(self, *, limit: int, lease_microseconds: int) -> list[ClaimedEvent]:
+        """Reclama hasta `limit` filas pendientes (`FOR UPDATE SKIP LOCKED`) y empuja su
+        `next_attempt_at` `lease_microseconds` al futuro. Debe confirmarse la transacción
+        antes de hacer I/O con lo reclamado."""
+        now = value_objects.PosixTime.now().microseconds
         stmt = (
-            select(orm_base.OutboxEventOrm)
-            .where(orm_base.OutboxEventOrm.published_at.is_(None))
+            sa.select(orm_base.OutboxEventOrm)
+            .where(
+                orm_base.OutboxEventOrm.published_at.is_(None),
+                orm_base.OutboxEventOrm.failed_at.is_(None),
+                orm_base.OutboxEventOrm.next_attempt_at <= now,
+            )
             .order_by(orm_base.OutboxEventOrm.created_at)
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
-        return list(self._session.scalars(stmt))
+        claimed: list[ClaimedEvent] = []
+        for row in self._session.scalars(stmt):
+            row.attempts += 1
+            row.next_attempt_at = now + lease_microseconds
+            claimed.append(
+                ClaimedEvent(
+                    row_id=row.id,
+                    event_type=row.event_type,
+                    payload=dict(row.payload),
+                    attempts=row.attempts,
+                )
+            )
+        return claimed
 
-    def mark_published(self, row: orm_base.OutboxEventOrm) -> None:
-        """For use on a row already loaded in this session (e.g. a non-IntegrationEvent row
-        skipped in the same read as `unpublished()`, ARCHITECTURE.md §11.1) — a plain
-        attribute write, no query."""
-        row.published_at = value_objects.PosixTime.now().microseconds
-
-    def mark_many_published(self, row_ids: list[uuid.UUID]) -> None:
-        """For use in a *separate* transaction from the one that read the rows (the outbox
-        relay's second, post-publish transaction — see outbox_relay.py) — the ORM instances
-        from that first transaction's session are gone, so this updates by id instead of
-        requiring a loaded row."""
-        if not row_ids:
-            return
+    def mark_delivered(
+        self, row_id: uuid.UUID, *, scrubbed_payload: dict[str, Any] | None = None
+    ) -> None:
+        values: dict[str, Any] = {
+            "published_at": value_objects.PosixTime.now().microseconds,
+            "last_error": None,
+        }
+        if scrubbed_payload is not None:
+            values["payload"] = scrubbed_payload
         self._session.execute(
-            update(orm_base.OutboxEventOrm)
-            .where(orm_base.OutboxEventOrm.id.in_(row_ids))
-            .values(published_at=value_objects.PosixTime.now().microseconds)
+            sa.update(orm_base.OutboxEventOrm)
+            .where(orm_base.OutboxEventOrm.id == row_id)
+            .values(**values)
+        )
+
+    def mark_retry(self, row_id: uuid.UUID, *, error: str, retry_at: int | None) -> None:
+        """`retry_at=None` ⇒ fallo definitivo (`failed_at`)."""
+        values: dict[str, Any] = {"last_error": error[:2000]}
+        if retry_at is None:
+            values["failed_at"] = value_objects.PosixTime.now().microseconds
+        else:
+            values["next_attempt_at"] = retry_at
+        self._session.execute(
+            sa.update(orm_base.OutboxEventOrm)
+            .where(orm_base.OutboxEventOrm.id == row_id)
+            .values(**values)
         )

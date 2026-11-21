@@ -1,30 +1,33 @@
 """Alembic environment — ARCHITECTURE.md §18. One shared metadata object
 (commons.adapters.orm_base.Base.metadata), autogenerate-only. Every subcontext's orm.py
 must be imported here so its tables register onto Base.metadata before autogenerate runs
-— easy to forget when adding a new subcontext, which is exactly why they're all listed
-explicitly below instead of relying on import side effects elsewhere."""
+— listed explicitly on purpose, so a new subcontext can't be silently forgotten."""
 
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from backend.commerce.orders.adapters import orm as orders_orm  # noqa: F401
-from backend.commerce.stock.adapters import orm as stock_orm  # noqa: F401
 from backend.commons.adapters import orm_base, settings
+from backend.identity.sessions.adapters import orm as sessions_orm  # noqa: F401
 from backend.identity.users.adapters import orm as users_orm  # noqa: F401
+from backend.projects.projects.adapters import orm as projects_orm  # noqa: F401
 
 config = context.config
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.get_postgres_uri())
+# La URL puede venir ya puesta por quien invoca (tests); si no, del Settings único.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option(
+        "sqlalchemy.url", settings.get_settings().postgres_uri.replace("%", "%%")
+    )
 target_metadata = orm_base.Base.metadata
 
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=settings.get_postgres_uri(),
+        url=config.get_main_option("sqlalchemy.url"),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.commons.adapters import audit as audit_module
 from backend.commons.adapters import engine, orm_base
 from backend.commons.adapters import outbox as outbox_module
+from backend.commons.adapters import rate_limit as rate_limit_module
 from backend.commons.domain import aggregates, exceptions, repositories, value_objects
 
 # A factory, not `type[Repository[Any]]` — the ABC (commons/domain/repositories.py)
@@ -62,6 +63,10 @@ class UnitOfWork:
     def audit(self) -> audit_module.AuditRepository:
         return audit_module.AuditRepository(self.session)
 
+    @property
+    def rate_limits(self) -> rate_limit_module.RateLimitRepository:
+        return rate_limit_module.RateLimitRepository(self.session)
+
     @contextlib.contextmanager
     def transaction(self, *, idempotency_key: str | None = None) -> Generator[None]:
         if self._session is not None:
@@ -99,11 +104,11 @@ class UnitOfWork:
         except sqlalchemy.exc.IntegrityError as exc:
             raise exceptions.DuplicatedTransactionError(
                 f"Request with idempotency key [{key}] was already processed.",
-                code="DUPLICATED_TRANSACTION",
+                code="duplicated_transaction",
             ) from exc
 
 
 def build() -> UnitOfWork:
     """Factory used by entrypoints (ARCHITECTURE.md §9.1/§9.4) — one call per request or
-    per event-batch invocation."""
+    per worker iteration."""
     return UnitOfWork()

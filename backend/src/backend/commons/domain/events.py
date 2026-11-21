@@ -38,5 +38,5 @@ def parse_envelope(body: str) -> dict[str, Any]:
     registry before calling `event_class.model_validate(envelope)`."""
     envelope = json.loads(body)
     if not isinstance(envelope, dict) or "event_type" not in envelope:
-        raise ValueError("SQS message body is not a valid event envelope (missing event_type).")
+        raise ValueError("Message body is not a valid event envelope (missing event_type).")
     return envelope
