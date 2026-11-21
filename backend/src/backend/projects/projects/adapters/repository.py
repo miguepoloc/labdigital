@@ -149,8 +149,8 @@ class DefaultProjectRepository(repositories.Repository[aggregate.Project]):
 
     def update(self, project: aggregate.Project) -> None:
         self._write_versions(project)
-        self._session.merge(_to_orm(project))
         try:
+            self._session.merge(_to_orm(project))
             self._session.flush()
         except sqlalchemy.orm.exc.StaleDataError as exc:
             raise commons_exceptions.ConcurrentModificationError(

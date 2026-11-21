@@ -154,8 +154,8 @@ class DefaultSubmissionRepository(repositories.Repository[aggregate.Submission])
 
     def update(self, submission: aggregate.Submission) -> None:
         """Sólo cambian estado y revisiones (las revisiones son de sólo inserción)."""
-        self._session.merge(_to_orm(submission))
         try:
+            self._session.merge(_to_orm(submission))
             self._session.flush()
         except sqlalchemy.orm.exc.StaleDataError as exc:
             raise commons_exceptions.ConcurrentModificationError(

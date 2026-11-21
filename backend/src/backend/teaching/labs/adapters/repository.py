@@ -104,8 +104,8 @@ class DefaultLabRepository(repositories.Repository[aggregate.Lab]):
         repository_helpers.publish_events(self._session, lab)
 
     def update(self, lab: aggregate.Lab) -> None:
-        self._session.merge(_lab_to_orm(lab))
         try:
+            self._session.merge(_lab_to_orm(lab))
             self._session.flush()
         except sqlalchemy.orm.exc.StaleDataError as exc:
             raise _stale() from exc
@@ -189,8 +189,8 @@ class DefaultTeamRepository(repositories.Repository[aggregate.Team]):
         repository_helpers.publish_events(self._session, team)
 
     def update(self, team: aggregate.Team) -> None:
-        self._session.merge(_team_to_orm(team))
         try:
+            self._session.merge(_team_to_orm(team))
             self._session.flush()
         except sqlalchemy.orm.exc.StaleDataError as exc:
             raise _stale() from exc

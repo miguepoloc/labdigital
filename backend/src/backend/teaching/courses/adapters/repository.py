@@ -223,8 +223,8 @@ class DefaultMembershipRepository(repositories.Repository[aggregate.Membership])
         repository_helpers.publish_events(self._session, membership)
 
     def update(self, membership: aggregate.Membership) -> None:
-        self._session.merge(_membership_to_orm(membership))
         try:
+            self._session.merge(_membership_to_orm(membership))
             self._session.flush()
         except sqlalchemy.orm.exc.StaleDataError as exc:
             raise _stale(exc) from exc
