@@ -74,6 +74,11 @@ class DefaultSessionRepository(repositories.Repository[aggregate.Session]):
             raise exceptions.SessionNotFoundError()
         return self._load(row)
 
+    def find(self, id: value_objects.SessionId) -> aggregate.Session | None:  # noqa: A002
+        """Lectura SIN bloqueo (comprobación de vida en cada petición)."""
+        row = self._session.get(orm.SessionOrm, id.value)
+        return None if row is None else self._load(row)
+
     def find_by_token_id(
         self, token_id: value_objects.RefreshTokenId
     ) -> tuple[aggregate.Session, value_objects.RefreshTokenRecord] | None:

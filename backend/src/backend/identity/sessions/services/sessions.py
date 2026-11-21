@@ -163,6 +163,24 @@ def ensure_active(*, uow: unit_of_work.UnitOfWork, session_id: str, user_id: str
             raise exceptions.RefreshTokenInvalidError()
 
 
+def is_live(
+    *, uow: unit_of_work.UnitOfWork, session_id: str, user_id: str, credentials_version: int
+) -> bool:
+    """¿La sesión `sid` del access sigue activa, es del usuario y con su misma `ver`?"""
+    try:
+        parsed = value_objects.SessionId(value=uuid.UUID(session_id))
+    except ValueError:
+        return False
+    with uow.transaction():
+        session = _repo(uow).find(parsed)
+    return (
+        session is not None
+        and str(session.user_id) == user_id
+        and session.is_active()
+        and session.credentials_version == credentials_version
+    )
+
+
 def list_active(
     *, uow: unit_of_work.UnitOfWork, user_id: str, current_session_id: str | None
 ) -> list[dto.SessionOutputDTO]:

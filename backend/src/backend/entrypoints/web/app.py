@@ -10,12 +10,14 @@ import fastapi
 from fastapi import responses, status
 import sqlalchemy as sa
 
-from backend.commons.adapters import engine, logs
+from backend.commons.adapters import authentication, engine, logs, unit_of_work
+from backend.commons.adapters.api import auth as api_auth
 from backend.commons.adapters.api import exception_handler, middleware
 from backend.files.entrypoints.web import files as files_web
 from backend.identity.entrypoints.web import admin as identity_admin
 from backend.identity.entrypoints.web import auth as identity_auth
 from backend.identity.entrypoints.web import me as identity_me
+from backend.identity.services import access_liveness_orchestrator
 from backend.orchestrators import ports as cross_ports
 from backend.projects.entrypoints.web import projects as projects_web
 from backend.teaching.entrypoints.web import _dependencies as teaching_deps
@@ -31,6 +33,15 @@ MAX_BODY_BYTES = 3 * 1024 * 1024
 MAX_UPLOAD_BODY_BYTES = 25 * 1024 * 1024 + 256 * 1024
 
 _LOGGER = logs.get_logger()
+
+
+def _access_is_live(claims: authentication.AccessClaims) -> bool:
+    return access_liveness_orchestrator.is_live(
+        uow=unit_of_work.build(),
+        user_id=claims.user_id,
+        session_id=claims.session_id,
+        credentials_version=claims.credentials_version,
+    )
 
 
 def create_app() -> fastapi.FastAPI:
@@ -51,6 +62,7 @@ def create_app() -> fastapi.FastAPI:
     )
     app.add_middleware(middleware.RequestLoggingMiddleware)
     exception_handler.install(app)
+    api_auth.register_liveness_check(_access_is_live)
 
     v1 = fastapi.APIRouter(prefix=API_PREFIX)
     v1.include_router(identity_auth.router)
