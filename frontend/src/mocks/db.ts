@@ -127,7 +127,14 @@ export function enablePersistence(): void {
   }
 }
 
+/** Imita la cookie indicadora `ld_session` (contrato §6.1): existe mientras haya refresh vigente. */
+function syncSessionHint(): void {
+  if (typeof document === 'undefined') return
+  document.cookie = db.refresh ? 'ld_session=1; path=/' : 'ld_session=; path=/; max-age=0'
+}
+
 export function save(): void {
+  syncSessionHint()
   if (!persist) return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db))

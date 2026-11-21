@@ -33,7 +33,7 @@ export function installGuards(router: Router, pinia: Pinia): void {
     }
 
     if (to.meta.guestOnly) {
-      const me = await session.ensureLoaded()
+      const me = await session.ensureLoaded({ optional: true })
       if (me) {
         const target = nextOrDefault(to.query.next)
         const routerPath = isSpaPath(target) ? toRouterPath(target) : null

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { authApi, meApi } from '@/api/auth'
 import { isApiError } from '@/api/errors'
 import type { LoginRequest, Me } from '@/api/types'
+import { hasSessionHint } from '@/lib/sessionHint'
 
 export type SessionStatus = 'idle' | 'loading' | 'ready'
 
@@ -40,9 +41,13 @@ export const useSessionStore = defineStore('session', () => {
     return loading
   }
 
-  /** Carga `me` sólo la primera vez (lo usa la guardia de rutas). */
-  async function ensureLoaded(): Promise<Me | null> {
+  /**
+   * Carga `me` sólo la primera vez (lo usa la guardia de rutas). Con `optional` (páginas públicas) no pregunta
+   * a la API si falta la cookie indicadora `ld_session`: sin ella no hay sesión que renovar.
+   */
+  async function ensureLoaded(opts: { optional?: boolean } = {}): Promise<Me | null> {
     if (status.value === 'ready') return me.value
+    if (opts.optional && !loading && !hasSessionHint()) return null
     return load()
   }
 

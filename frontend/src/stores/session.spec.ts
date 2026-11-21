@@ -55,6 +55,25 @@ describe('store de sesión', () => {
     server.events.removeAllListeners()
   })
 
+  it('ensureLoaded({ optional }) sin cookie ld_session no pide /me ni refresh (visitante)', async () => {
+    let calls = 0
+    server.events.on('request:start', () => calls++)
+    const s = useSessionStore()
+    await expect(s.ensureLoaded({ optional: true })).resolves.toBeNull()
+    expect(calls).toBe(0)
+    expect(s.status).toBe('idle')
+    server.events.removeAllListeners()
+  })
+
+  it('ensureLoaded({ optional }) con cookie ld_session sí carga /me', async () => {
+    signIn()
+    expect(document.cookie).toContain('ld_session=1')
+    const s = useSessionStore()
+    await expect(s.ensureLoaded({ optional: true })).resolves.toMatchObject({
+      email: 'estudiante@unimagdalena.edu.co',
+    })
+  })
+
   it('login() fija me; logout() cierra en el servidor y limpia', async () => {
     const s = useSessionStore()
     await s.login({

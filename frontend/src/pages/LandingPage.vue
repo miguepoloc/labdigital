@@ -37,7 +37,7 @@ useHead({ meta: [{ name: 'description', content: L.meta.description }] })
 
 onMounted(() => {
   // Página pública: si no hay sesión, `ensureLoaded` devuelve null sin redirigir.
-  void session.ensureLoaded()
+  void session.ensureLoaded({ optional: true })
 })
 </script>
 
