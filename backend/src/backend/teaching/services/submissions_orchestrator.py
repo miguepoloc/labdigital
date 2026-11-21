@@ -107,6 +107,7 @@ def list_for_lab(
     uow: unit_of_work.UnitOfWork,
     viewer: teaching_value_objects.Viewer,
     directory: ports.UserDirectory,
+    files_port: ports.FilesPort,
     lab_id: str,
 ) -> list[dto.SubmissionListItemOutputDTO]:
     """Docente: todas; estudiante: las suyas o de su equipo."""
@@ -116,9 +117,10 @@ def list_for_lab(
     records = submissions.list_for_lab(
         uow=uow, lab_id=lab_id, member_id=None if access.can_manage else str(viewer.user_id)
     )
-    names = _access.people(directory, [i for r in records for i in (r.submitter_id, *r.member_ids)])
+    names = _people(directory, records)
     teams = _team_names(uow, records)
-    return [_list_item(r, names, teams) for r in records]
+    mimes = _mimes(files_port, records)
+    return [_list_item(r, names, teams, mimes) for r in records]
 
 
 def get_submission(
@@ -206,15 +208,38 @@ def _team_names(
     return {t: labs.get_team(uow=uow, team_id=t).name for t in team_ids}
 
 
+def _people(
+    directory: ports.UserDirectory, records: list[submissions_dto.SubmissionRecordDTO]
+) -> dict[str, dto.PersonOutputDTO]:
+    """Nombres de quien entregó, integrantes y revisores de todas las entregas."""
+    return _access.people(
+        directory,
+        [
+            i
+            for r in records
+            for i in (r.submitter_id, *r.member_ids, *(rv.reviewer_id for rv in r.reviews))
+        ],
+    )
+
+
+def _mimes(
+    files_port: ports.FilesPort, records: list[submissions_dto.SubmissionRecordDTO]
+) -> dict[str, str]:
+    blob_ids = [f.blob_id for r in records for f in r.files]
+    return {f.id: f.mime for f in files_port.describe(blob_ids)} if blob_ids else {}
+
+
 def _list_item(
     record: submissions_dto.SubmissionRecordDTO,
     names: dict[str, dto.PersonOutputDTO],
     teams: dict[str, str],
+    mimes: dict[str, str],
 ) -> dto.SubmissionListItemOutputDTO:
     return dto.SubmissionListItemOutputDTO(
         **submissions_dto.SubmissionSummaryDTO.from_record(record).model_dump(),
         lab_id=record.lab_id,
         project_id=record.project_id,
+        project_name=record.project_name,
         version_id=record.version_id,
         version_n=record.version_n,
         submitted_by=names[record.submitter_id],
@@ -222,36 +247,13 @@ def _list_item(
         if record.team_id is None
         else dto.TeamRefOutputDTO(id=record.team_id, name=teams.get(record.team_id, "")),
         members=[names[m] for m in record.member_ids],
-    )
-
-
-def _detail(
-    uow: unit_of_work.UnitOfWork,
-    record: submissions_dto.SubmissionRecordDTO,
-    projects_port: ports.ProjectsPort,
-    files_port: ports.FilesPort,
-    directory: ports.UserDirectory,
-) -> dto.SubmissionOutputDTO:
-    names = _access.people(
-        directory,
-        [record.submitter_id, *record.member_ids, *(r.reviewer_id for r in record.reviews)],
-    )
-    stored = (
-        {f.id: f for f in files_port.describe([f.blob_id for f in record.files])}
-        if record.files
-        else {}
-    )
-    content: dict[str, Any] = projects_port.frozen_content(version_id=record.version_id)
-    item = _list_item(record, names, _team_names(uow, [record]))
-    return dto.SubmissionOutputDTO(
-        **item.model_dump(),
         files=[
             dto.SubmissionFileOutputDTO(
                 id=f.blob_id,
                 kind=f.kind,
                 name=f.name,
                 size=f.size,
-                mime=stored[f.blob_id].mime if f.blob_id in stored else "application/octet-stream",
+                mime=mimes.get(f.blob_id, "application/octet-stream"),
             )
             for f in record.files
         ],
@@ -266,5 +268,21 @@ def _detail(
             )
             for r in record.reviews
         ],
-        content=content,
     )
+
+
+def _detail(
+    uow: unit_of_work.UnitOfWork,
+    record: submissions_dto.SubmissionRecordDTO,
+    projects_port: ports.ProjectsPort,
+    files_port: ports.FilesPort,
+    directory: ports.UserDirectory,
+) -> dto.SubmissionOutputDTO:
+    content: dict[str, Any] = projects_port.frozen_content(version_id=record.version_id)
+    item = _list_item(
+        record,
+        _people(directory, [record]),
+        _team_names(uow, [record]),
+        _mimes(files_port, [record]),
+    )
+    return dto.SubmissionOutputDTO(**item.model_dump(), content=content)

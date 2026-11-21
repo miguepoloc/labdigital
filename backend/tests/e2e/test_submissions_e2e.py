@@ -82,6 +82,11 @@ def test_individual_submission_freezes_version_review_and_resubmission(env: e2e.
     h.error(h.submit(student, lab["id"], pid), 409, "resubmission_not_allowed")
     listed = h.ok(student.get(f"{API}/labs/{lab['id']}/submissions"))
     assert [s["attempt"] for s in listed] == [2, 1] and "content" not in listed[0]
+    # El historial de intentos necesita nombre del proyecto, archivos y revisiones de cada uno.
+    assert listed[0]["project_name"] == created["project_name"] != ""
+    assert listed[1]["reviews"][0]["returned_for_resubmission"] is True
+    assert listed[1]["reviews"][0]["comment"] == "Falta el testbench"
+    assert listed[0]["files"] == second["files"]
 
 
 def test_team_submission_any_member_and_visibility(env: e2e.Env) -> None:

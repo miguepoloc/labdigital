@@ -54,10 +54,14 @@ def submit(
 
 @router.get("/labs/{lab_id}/submissions", response_model=list[dto.SubmissionListItemOutputDTO])
 def list_submissions(
-    lab_id: str, viewer: deps.ViewerDep, uow: deps.UowDep, directory: deps.DirectoryDep
+    lab_id: str,
+    viewer: deps.ViewerDep,
+    uow: deps.UowDep,
+    directory: deps.DirectoryDep,
+    files_port: deps.FilesDep,
 ) -> list[dto.SubmissionListItemOutputDTO]:
     return submissions_orchestrator.list_for_lab(
-        uow=uow, viewer=viewer, directory=directory, lab_id=lab_id
+        uow=uow, viewer=viewer, directory=directory, files_port=files_port, lab_id=lab_id
     )
 
 

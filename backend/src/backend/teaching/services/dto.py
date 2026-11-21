@@ -55,22 +55,24 @@ class ReviewOutputDTO(dto.BaseDTO):
 
 
 class SubmissionListItemOutputDTO(submissions_dto.SubmissionSummaryDTO):
-    """Listado: `SubmissionSummary` + quién y qué versión (sin `content`)."""
+    """Listado: `Submission` sin `content` (el historial de intentos muestra archivos y
+    revisiones de cada uno)."""
 
     lab_id: str
     project_id: str
+    project_name: str
     version_id: str
     version_n: int
     submitted_by: PersonOutputDTO
     team: TeamRefOutputDTO | None
     members: list[PersonOutputDTO]
+    files: list[SubmissionFileOutputDTO]
+    reviews: list[ReviewOutputDTO]
 
 
 class SubmissionOutputDTO(SubmissionListItemOutputDTO):
-    """`Submission` (contrato §6.1): incluye `files`, `reviews` y `content` congelado."""
+    """`Submission` (contrato §6.1): lo del listado más el `content` congelado."""
 
-    files: list[SubmissionFileOutputDTO]
-    reviews: list[ReviewOutputDTO]
     content: dict[str, Any]
 
 

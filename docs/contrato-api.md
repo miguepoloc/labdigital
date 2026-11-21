@@ -133,8 +133,8 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
   `team_required`, `resubmission_not_allowed`, `lab_not_open`; `invalid_code` es 404.
 - **Precisiones de LD-4/5/6** (backend fase 2): `X-LabDigital-Email` y `X-LabDigital-Name` van URL-encoded.
   Códigos 409 adicionales: `lab_published`, `course_archived`, `cannot_modify_self`, `invalid_transition`,
-  `not_in_team`, `not_team_lab`. `GET /labs/{id}/submissions` devuelve `SubmissionSummary` + `{submitted_by, team,
-  version_n}` (sin `content`). `POST /labs/{id}/teams` devuelve el `Team` completo. `POST /files` es multipart con
+  `not_in_team`, `not_team_lab`. `GET /labs/{id}/submissions` devuelve `Submission` **sin `content`** (con
+  `files` y `reviews`, para el historial de intentos). `Submission` incluye además `project_name`. `POST /labs/{id}/teams` devuelve el `Team` completo. `POST /files` es multipart con
   campos `file` y `kind`; `PUT /teams/{id}/members` recibe una lista JSON de ids de usuario (`["uuid", …]`).
 - **Sesión en cada petición privada**: toda ruta autenticada (salvo `GET /auth/verify`) comprueba en BD que `sid`
   sigue activa y que `ver` coincide; un access robado muere al cerrar sesión, revocar, cambiar contraseña o desactivar.
