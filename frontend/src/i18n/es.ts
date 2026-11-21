@@ -1,3 +1,4 @@
+import { landing } from './es.landing'
 /**
  * Textos en español. Para añadir inglés: crear `en.ts` con la misma forma (`satisfies Messages`)
  * y elegir el diccionario en `i18n/index.ts`.
@@ -183,40 +184,7 @@ export const es = {
     body: 'La dirección no existe o se movió.',
     back: 'Volver al inicio',
   },
-  landing: {
-    heroEyebrow: 'Ingeniería Electrónica · Universidad del Magdalena',
-    heroTitle: 'Laboratorios de electrónica digital, en tu navegador',
-    heroBody:
-      'LabDigital reúne simuladores, cursos y entregas de la línea digital: diseña, simula y entrega tus laboratorios desde cualquier lugar.',
-    ctaStart: 'Crear cuenta',
-    ctaLogin: 'Ya tengo cuenta',
-    ctaApp: 'Ir a mi espacio',
-    sections: {
-      modules: {
-        title: 'Módulos',
-        body: 'FPGA Basys 3 disponible; circuitos digitales y microcontroladores, próximamente.',
-      },
-      features: {
-        title: 'Qué puedes hacer',
-        body: 'Simulación VHDL, placa virtual, formas de onda, síntesis, asistente con IA e informe.',
-      },
-      teachers: {
-        title: 'Para docentes',
-        body: 'Crea cursos, publica laboratorios con fechas y escala de notas, y revisa las entregas.',
-      },
-      agent: {
-        title: 'Agente de hardware',
-        body: 'Programa la Basys 3 real conectada a tu computador desde el simulador.',
-      },
-      team: {
-        title: 'Equipo',
-        body: 'Desarrollado por el grupo de investigación GIDEAM de la Universidad del Magdalena.',
-      },
-    },
-    placeholder: 'Contenido en diseño (LD-12).',
-    footerPolicy: 'Política de tratamiento de datos',
-    footerRights: '© {year} Universidad del Magdalena · GIDEAM',
-  },
+  landing,
   common: {
     close: 'Cerrar',
     cancel: 'Cancelar',
