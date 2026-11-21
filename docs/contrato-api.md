@@ -110,6 +110,16 @@ window.JGFPGA = {
 Se dispara `window.parent.postMessage({ type: "jgfpga:ready", version: "1" }, location.origin)` al cargar.
 El envoltorio de LabDigital (mismo origen) usa sólo esta API.
 
+Precisiones (implementación en `mcangen/JG-FPGA` rama `feat/api-integracion`, `docs/EMBED.md`):
+- `on("change", fn)`: `fn(content)` recibe el proyecto; se emite 1 s después de la última edición y sólo si cambió.
+  `"ready"` también se entrega a quien se suscribe tarde. Extra: `readOnly()` → boolean.
+- `loadProject` **lanza** si `format`/`version`/`files` no son válidos, devuelve la lista de archivos omitidos y no emite `change`.
+- Embebido, JG FPGA guarda su caché en claves propias (`basys-project-embed`), así que **el envoltorio debe llamar siempre
+  a `loadProject` al recibir `ready`** (si no, se vería la última caché, editable).
+- `getLastBitstream()` devuelve el `.bit` más reciente **de ese navegador**, no necesariamente del proyecto abierto:
+  el envoltorio debe mostrar su nombre y fecha para que el estudiante confirme antes de adjuntarlo.
+- Errores de red/HTTP en `getLastBitstream`/`getReportDocx` se lanzan (no devuelven `null`): capturarlos.
+
 ## 8. Convenciones de repo
 
 Ramas `miguel.polo/<tipo>/LD-<n>-<descripcion>`; commits `<tipo>(<scope>): #LD-<n> <descripción>`; todo por PR a
