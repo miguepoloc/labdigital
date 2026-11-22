@@ -189,7 +189,9 @@ describe('Envoltorio FPGA: carga', () => {
     fake.edit('-- nuevo')
     await wait(DEBOUNCE + 30)
     await settle()
-    expect(st.calls.autosave.at(-1)).toMatchObject({ base_version: created.versions.find((v) => v.id === created.currentId)!.n })
+    expect(st.calls.autosave.at(-1)).toMatchObject({
+      base_version: created.versions.find((v) => v.id === created.currentId)!.n,
+    })
     wrapper.unmount()
   })
 })

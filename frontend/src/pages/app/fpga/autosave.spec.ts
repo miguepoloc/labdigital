@@ -95,12 +95,20 @@ describe('Autosaver', () => {
     let fail = true
     const { saver, calls } = setup(async (b) => {
       if (fail) throw conflict(12)
-      return { version_id: 'v' + String(b.base_version), n: b.base_version, revision: b.base_revision + 1 }
+      return {
+        version_id: 'v' + String(b.base_version),
+        n: b.base_version,
+        revision: b.base_revision + 1,
+      }
     })
     saver.change(content('mio'))
     await vi.advanceTimersByTimeAsync(5000)
     expect(saver.snapshot.status).toBe('conflict')
-    expect(saver.snapshot.conflict).toEqual({ current_version: 9, current_revision: 12, current_version_id: 'v9' })
+    expect(saver.snapshot.conflict).toEqual({
+      current_version: 9,
+      current_revision: 12,
+      current_version_id: 'v9',
+    })
     saver.change(content('mio 2'))
     await vi.advanceTimersByTimeAsync(60_000)
     expect(calls).toHaveLength(1)
