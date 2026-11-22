@@ -228,9 +228,9 @@ Diseñar y simular un **sumador completo de 1 bit** en VHDL y extenderlo a 4 bit
 
 ## Procedimiento
 
-1. Escriba la entidad \`full_adder\` con entradas \`a\`, \`b\`, \`cin\` y salidas \`s\`, \`cout\`.
-2. Instancie cuatro sumadores para formar \`adder4\`.
-3. Simule todas las combinaciones con un *testbench* y revise las formas de onda.
+1. Escribe la entidad \`full_adder\` con entradas \`a\`, \`b\`, \`cin\` y salidas \`s\`, \`cout\`.
+2. Instancia cuatro sumadores para formar \`adder4\`.
+3. Simula todas las combinaciones con un *testbench* y revisa las formas de onda.
 
 ## Entregables
 
@@ -238,20 +238,20 @@ Diseñar y simular un **sumador completo de 1 bit** en VHDL y extenderlo a 4 bit
 - Informe en PDF con capturas de la simulación.
 - Archivo \`.bit\` generado para la Basys 3.
 
-> Consulte la [guía de VHDL](https://ghdl.github.io/ghdl/) si tiene dudas.
+> Consulta la [guía de VHDL](https://ghdl.github.io/ghdl/) si tienes dudas.
 `
 
 const STATEMENT_LAB2 = `# Contador BCD
 
-Implemente un contador BCD de 0 a 9 que muestre el valor en el display de 7 segmentos de la Basys 3.
+Implementa un contador BCD de 0 a 9 que muestre el valor en el display de 7 segmentos de la Basys 3.
 
-- Use el reloj de 100 MHz con un divisor a 1 Hz.
+- Usa el reloj de 100 MHz con un divisor a 1 Hz.
 - El botón central reinicia la cuenta.
 
 \`\`\`vhdl
 process (clk) begin
   if rising_edge(clk) then
-    -- su código aquí
+    -- tu código aquí
   end if;
 end process;
 \`\`\`
@@ -505,7 +505,7 @@ function seedState(): CoursesState {
       reviewer_id: carlos,
       grade: null,
       comment:
-        'Falta el testbench que pruebe las 8 combinaciones. Agréguelo y vuelva a entregar, por favor.',
+        'Falta el testbench que pruebe las 8 combinaciones. Agrégalo y vuelve a entregar, por favor.',
       return_for_resubmission: true,
       created_at: iso(lab1Due - 1 * DAY),
     },
@@ -523,7 +523,7 @@ function seedState(): CoursesState {
       submission_id: IDS.subSofia3,
       reviewer_id: carlos,
       grade: 3.8,
-      comment: 'Funciona. Revise los estados no alcanzables.',
+      comment: 'Funciona. Revisa los estados no alcanzables.',
       return_for_resubmission: false,
       created_at: iso(now - 2 * DAY),
     },

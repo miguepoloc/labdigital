@@ -1,11 +1,11 @@
 /**
  * Textos de la landing pública (LD-12). Diseño aprobado: /labdigital/preview/ (artifact "Design").
- * Se mantienen literalmente los textos del diseño; el trato es de "usted" como en el diseño.
+ * Parten de los textos del diseño, adaptados al trato de tú del resto de la plataforma.
  */
 export const landing = {
   meta: {
     description:
-      'Laboratorios de la línea digital de Ingeniería Electrónica de la Universidad del Magdalena: simule, sintetice y entregue sus prácticas desde el navegador.',
+      'Laboratorios de la línea digital de Ingeniería Electrónica de la Universidad del Magdalena: simula, sintetiza y entrega tus prácticas desde el navegador.',
   },
   top: {
     tagline: 'GIDEAM · Ingeniería Electrónica',
@@ -24,9 +24,9 @@ export const landing = {
     titleBefore: 'Del primer ',
     titleEm: 'AND',
     titleAfter: ' al bitstream, en el navegador.',
-    subBefore: 'Escriba VHDL o dibuje el circuito, simúlelo sobre una Basys 3 virtual, genere el ',
+    subBefore: 'Escribe VHDL o dibuja el circuito, simúlalo sobre una Basys 3 virtual, genera el ',
     subCode: '.bit',
-    subAfter: ' y entregue la práctica a su docente. Sin instalar Vivado.',
+    subAfter: ' y entrega la práctica a tu docente. Sin instalar Vivado.',
     ctaRegister: 'Crear cuenta gratis',
     ctaMore: 'Ver qué incluye',
     noteBefore: 'Basys 3 · Artix-7 ',
@@ -76,7 +76,7 @@ export const landing = {
       {
         icon: 'board',
         title: 'Placa simulada',
-        body: 'Switches, botones, LEDs y displays de la Basys 3 responden a su diseño en tiempo real.',
+        body: 'Switches, botones, LEDs y displays de la Basys 3 responden a tu diseño en tiempo real.',
       },
       {
         icon: 'wave',
@@ -86,12 +86,12 @@ export const landing = {
       {
         icon: 'chip',
         title: 'Síntesis al bitstream',
-        body: 'Genere el .bit en el servidor con herramientas libres y grábelo en la placa real.',
+        body: 'Genera el .bit en el servidor con herramientas libres y grábalo en la placa real.',
       },
       {
         icon: 'bulb',
         title: 'Asistente con IA',
-        body: 'Explica errores y propone cambios con su propia clave gratuita de Gemini, que se queda en su navegador.',
+        body: 'Explica errores y propone cambios con tu propia clave gratuita de Gemini, que se queda en tu navegador.',
       },
       {
         icon: 'doc',
@@ -102,24 +102,24 @@ export const landing = {
   },
   teachers: {
     eyebrow: 'Para docentes',
-    title: 'Cree el curso, publique el laboratorio y revise desde el simulador',
-    lead: 'Cualquier persona con cuenta puede abrir un curso. Usted decide quién entra, cómo se califica y qué pasa con las entregas tardías.',
+    title: 'Crea el curso, publica el laboratorio y revisa desde el simulador',
+    lead: 'Cualquier persona con cuenta puede abrir un curso. Tú decides quién entra, cómo se califica y qué pasa con las entregas tardías.',
     flow: [
       {
-        title: 'Abra un curso',
-        body: 'Comparta el código con sus estudiantes y apruebe cada solicitud de ingreso.',
+        title: 'Abre un curso',
+        body: 'Comparte el código con tus estudiantes y aprueba cada solicitud de ingreso.',
       },
       {
-        title: 'Publique laboratorios',
+        title: 'Publica laboratorios',
         body: 'Enunciado, fecha límite (cierre, tardía marcada o sin fecha), trabajo individual o en equipo y su propia escala de nota.',
       },
       {
-        title: 'Revise cada entrega',
-        body: 'Abra el proyecto congelado en el simulador, lea el informe, descargue el .bit, comente y califique.',
+        title: 'Revisa cada entrega',
+        body: 'Abre el proyecto congelado en el simulador, lee el informe, descarga el .bit, comenta y califica.',
       },
       {
-        title: 'Permita correcciones',
-        body: 'Devuelva la entrega con comentarios; el estudiante reentrega y queda el historial de intentos.',
+        title: 'Permite correcciones',
+        body: 'Devuelve la entrega con comentarios; el estudiante reentrega y queda el historial de intentos.',
       },
     ],
     grades: {
@@ -160,19 +160,19 @@ export const landing = {
   },
   agent: {
     eyebrow: 'Placa real',
-    title: 'Programe su Basys 3 con un clic',
-    lead: 'La web no puede usar el USB de su computador. El agente JG FPGA se ejecuta en su PC, se empareja con la web mediante un código y graba el bitstream en la placa.',
+    title: 'Programa tu Basys 3 con un clic',
+    lead: 'La web no puede usar el USB de tu computador. El agente JG FPGA se ejecuta en tu PC, se empareja con la web mediante un código y graba el bitstream en la placa.',
     windows: 'Agente para Windows',
     mac: 'Agente para macOS',
     notes: {
       versionBefore:
         'Versión 1.1.0. En Windows incluye Digilent Adept; en macOS usa openFPGALoader.',
-      localBefore: 'Escucha solo en su propio equipo (',
+      localBefore: 'Escucha solo en tu propio equipo (',
       localCode: '127.0.0.1',
       localAfter: ') y atiende únicamente a la web emparejada.',
-      noAgentBefore: '¿Sin agente? Descargue el ',
+      noAgentBefore: '¿Sin agente? Descarga el ',
       noAgentCode: '.bit',
-      noAgentAfter: ' y grábelo con Adept, Vivado u openFPGALoader.',
+      noAgentAfter: ' y grábalo con Adept, Vivado u openFPGALoader.',
     },
   },
   team: {
@@ -180,8 +180,19 @@ export const landing = {
     title: 'Un proyecto del grupo de investigación GIDEAM',
     lead: 'Grupo de Investigación en Desarrollo Electrónico y Aplicaciones Móviles, adscrito al programa de Ingeniería Electrónica de la Facultad de Ingeniería de la Universidad del Magdalena, en Santa Marta.',
     body: 'LabDigital y el módulo JG FPGA se desarrollan con docentes, estudiantes y semilleros del grupo.',
-    link: 'Conozca GIDEAM',
-    pending: 'Integrantes y créditos: pendiente de confirmar con el equipo.',
+    link: 'Conoce GIDEAM',
+    creditsTitle: 'Créditos',
+    credits: [
+      {
+        name: 'José Granados',
+        role: 'Autor de JG FPGA, el simulador y la síntesis VHDL para la Basys 3.',
+      },
+      {
+        name: 'Miguel Polo',
+        role: 'Autor de LabDigital, la plataforma de cursos, laboratorios y entregas.',
+      },
+    ],
+    creditsAffiliation: 'GIDEAM · Ingeniería Electrónica, Universidad del Magdalena.',
     facts: [
       { value: '2007', label: 'Adscrito a Ingeniería Electrónica' },
       { value: '5+', label: 'Líneas de investigación' },
@@ -190,18 +201,18 @@ export const landing = {
     ],
   },
   final: {
-    title: 'Su próximo laboratorio empieza con una cuenta.',
+    title: 'Tu próximo laboratorio empieza con una cuenta.',
     register: 'Crear cuenta',
     login: 'Ya tengo cuenta',
   },
   footer: {
     line1:
       'LabDigital GIDEAM · Ingeniería Electrónica, Universidad del Magdalena · Santa Marta, Colombia.',
-    line2Before: 'Al crear una cuenta acepta la ',
-    line2Link: 'política de tratamiento de datos personales',
+    line2Before: 'Al crear una cuenta aceptas la ',
+    line2Link: 'política de protección de datos personales',
     line2After: ' de la Universidad del Magdalena (Ley 1581 de 2012).',
     designSystem: 'Design system',
   },
   /** Usado también por AuthLayout. */
-  footerPolicy: 'Política de tratamiento de datos',
+  footerPolicy: 'Política de protección de datos',
 }

@@ -16,7 +16,7 @@ def _user(email: str = "ada@example.com") -> aggregate.User:
         email=value_objects.Email(value=email),
         full_name=value_objects.FullName(value="Ada Lovelace"),
         plaintext_password="caballo-bateria-grapa",
-        data_policy_version="2026-11",
+        data_policy_version="acuerdo-17-2018",
     )
 
 

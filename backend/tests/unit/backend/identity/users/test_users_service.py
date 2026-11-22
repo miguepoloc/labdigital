@@ -54,7 +54,7 @@ def test_register_creates_user_records_policy_and_sends_verification() -> None:
     _register(f)
 
     (user,) = f.users.by_id.values()
-    assert user.data_policy.version == "2026-11"
+    assert user.data_policy.version == "acuerdo-17-2018"
     assert not user.is_email_verified
     (event,) = helpers.email_events(f.uow.outbox.recorded, category="verify_email")
     assert event.message.to == _EMAIL

@@ -28,7 +28,7 @@ describe('RegisterPage (/registro)', () => {
     await fill(wrapper, {})
     const text = wrapper.text()
     expect(text).toContain('Revisa los campos marcados.')
-    expect(text).toContain('Debes aceptar la política de tratamiento de datos')
+    expect(text).toContain('Debes aceptar la política de protección de datos')
     expect(wrapper.findAll('[aria-invalid="true"]')).toHaveLength(4)
     wrapper.unmount()
   })

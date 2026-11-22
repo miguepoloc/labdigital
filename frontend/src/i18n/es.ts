@@ -56,7 +56,7 @@ export const es = {
     passwordMin: 'La contraseña debe tener al menos {min} caracteres.',
     passwordMatch: 'Las contraseñas no coinciden.',
     fullNameMin: 'Escribe tu nombre completo.',
-    acceptPolicy: 'Debes aceptar la política de tratamiento de datos para crear la cuenta.',
+    acceptPolicy: 'Debes aceptar la política de protección de datos para crear la cuenta.',
     formHasErrors: 'Revisa los campos marcados.',
   },
   password: {
@@ -102,7 +102,7 @@ export const es = {
     title: 'Crear una cuenta',
     subtitle: 'Con tu cuenta podrás guardar proyectos, unirte a cursos y entregar laboratorios.',
     acceptPrefix: 'He leído y acepto la',
-    policyLink: 'política de tratamiento de datos personales de la Universidad del Magdalena',
+    policyLink: 'política de protección de datos personales de la Universidad del Magdalena',
     acceptSuffix: '(Ley 1581 de 2012).',
     submit: 'Crear cuenta',
     submitting: 'Creando cuenta…',

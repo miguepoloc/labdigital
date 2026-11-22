@@ -232,7 +232,7 @@ export const esCourses = {
     createLabel: 'Nombre del equipo',
     createPlaceholder: 'Los Flip-Flops',
     create: 'Crear equipo',
-    created: 'Equipo creado. Comparte el código {code} con sus compañeros.',
+    created: 'Equipo creado. Comparte el código {code} con tus compañeros.',
     joinLabel: 'Código del equipo',
     join: 'Unirme',
     joined: 'Te uniste al equipo «{name}».',

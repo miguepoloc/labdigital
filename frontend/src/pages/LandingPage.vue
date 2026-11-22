@@ -345,7 +345,15 @@ onMounted(() => {
               {{ t('landing.team.body') }}
               <a :href="GIDEAM_URL">{{ t('landing.team.link') }}</a>.
             </p>
-            <span class="lp-pending">{{ t('landing.team.pending') }}</span>
+            <div class="lp-credits">
+              <h3 class="lp-credits__title">{{ t('landing.team.creditsTitle') }}</h3>
+              <ul class="lp-credits__list">
+                <li v-for="c in L.team.credits" :key="c.name">
+                  <b>{{ c.name }}</b> — {{ c.role }}
+                </li>
+              </ul>
+              <p class="lp-credits__aff">{{ t('landing.team.creditsAffiliation') }}</p>
+            </div>
           </div>
           <div class="lp-facts">
             <div v-for="f in L.team.facts" :key="f.value" class="lp-fact">
@@ -1073,15 +1081,31 @@ onMounted(() => {
   font-size: 14px;
 }
 
-.lp-pending {
-  display: inline-block;
-  margin-top: 12px;
+.lp-credits {
+  margin-top: 20px;
+  background: var(--ld-color-surface-2);
+  border: 1px solid var(--ld-color-border);
+  border-radius: var(--ld-radius-sm);
+  padding: 14px 16px;
+}
+
+.lp-credits__title {
+  margin: 0 0 8px;
+  font: 700 16px var(--ld-font-heading);
+}
+
+.lp-credits__list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 15px;
+}
+
+.lp-credits__aff {
+  margin: 10px 0 0;
   font-size: 13px;
   color: var(--ld-color-text-muted);
-  background: var(--ld-color-surface-2);
-  border: 1px dashed var(--ld-color-border);
-  border-radius: var(--ld-radius-sm);
-  padding: 6px 10px;
 }
 
 @media (max-width: 820px) {

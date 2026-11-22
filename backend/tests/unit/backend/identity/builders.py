@@ -13,7 +13,7 @@ from tests.unit.backend.identity.users import fakes as users_fakes
 CONFIG = users_dto.UsersConfig(
     public_base_url=conftest.PUBLIC_BASE_URL,
     admin_emails=frozenset({conftest.ADMIN_EMAIL}),
-    data_policy_version="2026-11",
+    data_policy_version="acuerdo-17-2018",
 )
 CONTEXT = users_dto.RequestContext(ip="10.0.0.1", user_agent="pytest")
 

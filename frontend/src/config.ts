@@ -7,10 +7,10 @@ export const config = {
   /** Ruta privada por defecto tras iniciar sesión. */
   defaultAfterLogin: '/labdigital/app',
   /**
-   * Política de tratamiento de datos personales de Unimagdalena (Ley 1581 de 2012).
-   * TODO(LD-7): confirmar la URL exacta con la universidad (pendiente en docs/plan.md).
+   * Manual de protección de datos personales de Unimagdalena (Acuerdo Superior N.º 17 de 2018,
+   * Ley 1581 de 2012).
    */
-  dataPolicyUrl: 'https://www.unimagdalena.edu.co/Publico/ProteccionDatos',
+  dataPolicyUrl: 'https://www.unimagdalena.edu.co/Content/Public/Docs/ManualProteccionDeDatos.pdf',
   /** Escudo oficial del CDN institucional. */
   escudo: {
     light: 'https://cdn.unimagdalena.edu.co/images/escudo/bg_light/128.png',

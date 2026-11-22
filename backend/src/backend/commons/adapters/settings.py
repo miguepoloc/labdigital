@@ -56,9 +56,9 @@ class Settings(pydantic_settings.BaseSettings):
     admin_emails: str = ""
     cookie_secure: bool = True
 
-    # Versión vigente de la política de tratamiento de datos (Ley 1581/2012) que se
-    # registra junto a la fecha de aceptación en el registro.
-    data_policy_version: str = "2026-11"
+    # Versión vigente de la política de protección de datos (Acuerdo Superior 17 de 2018,
+    # Ley 1581/2012) que se registra junto a la fecha de aceptación en el registro.
+    data_policy_version: str = "acuerdo-17-2018"
 
     # Archivos subidos (contenido direccionado por SHA-256; volumen `labdigital-blobs`).
     blob_dir: str = "/data/blobs"

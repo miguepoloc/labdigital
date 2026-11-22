@@ -4,7 +4,7 @@ import { errorMessage, fieldErrors } from '@/lib/errors'
 
 /**
  * Mensaje para errores de cursos/labs/entregas: primero los textos propios (`courseErrors.<code>`, en
- * trato de usted), luego los generales. Un `validation_error` con un solo campo muestra ese mensaje.
+ * trato de tú), luego los generales. Un `validation_error` con un solo campo muestra ese mensaje.
  */
 export function courseErrorMessage(e: unknown): string {
   if (isApiError(e)) {

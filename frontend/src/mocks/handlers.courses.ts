@@ -38,7 +38,7 @@ function err(status: number, code: string, message: string, details?: Record<str
 }
 const validation = (fields: Record<string, string>) =>
   err(422, 'validation_error', 'Datos no válidos.', { fields })
-const forbidden = () => err(403, 'forbidden', 'No tiene permiso.')
+const forbidden = () => err(403, 'forbidden', 'No tienes permiso.')
 const notFound = () => err(404, 'not_found', 'No encontrado.')
 const noContent = () => new HttpResponse(null, { status: 204 })
 
@@ -226,7 +226,7 @@ function toTeam(t: MTeam, userId: string, isTeacher: boolean) {
 function validateCourse(body: Partial<CourseInput>, partial: boolean) {
   const fields: Record<string, string> = {}
   if ((!partial || body.name !== undefined) && !body.name?.trim())
-    fields.name = 'Escriba el nombre.'
+    fields.name = 'Escribe el nombre.'
   if ((!partial || body.period !== undefined) && !body.period?.trim())
     fields.period = 'Indique el periodo.'
   return fields
@@ -244,7 +244,7 @@ function validateScaleServer(s: GradeScale | undefined): string | null {
 function validateLab(body: Partial<LabInput>, partial: boolean) {
   const fields: Record<string, string> = {}
   const has = (k: keyof LabInput) => !partial || body[k] !== undefined
-  if (has('title') && !body.title?.trim()) fields.title = 'Escriba el título.'
+  if (has('title') && !body.title?.trim()) fields.title = 'Escribe el título.'
   if (has('deadline_policy') && !['strict', 'late_marked', 'none'].includes(body.deadline_policy!))
     fields.deadline_policy = 'Política no válida.'
   if (body.deadline_policy && body.deadline_policy !== 'none' && has('due_at') && !body.due_at)
@@ -343,13 +343,13 @@ export const courseHandlers = [
     authed(async ({ request, user }) => {
       const { code } = (await request.json()) as { code?: string }
       const normalized = (code ?? '').trim().toUpperCase()
-      if (!normalized) return validation({ code: 'Escriba el código.' })
+      if (!normalized) return validation({ code: 'Escribe el código.' })
       const c = cdb.courses.find((x) => x.join_code === normalized && !x.archived_at)
       if (!c) return err(404, 'invalid_code', 'Código no válido.')
       if (c.owner_id === user.id) return err(409, 'already_member', 'Ya es el docente.')
       const m = membership(c.id, user.id)
       if (m && (m.status === 'active' || m.status === 'pending'))
-        return err(409, 'already_member', 'Ya pertenece o tiene solicitud.')
+        return err(409, 'already_member', 'Ya perteneces o tienes solicitud.')
       if (m) {
         m.status = 'pending'
         m.requested_at = new Date().toISOString()
@@ -593,7 +593,7 @@ export const courseHandlers = [
         (t) => t.lab_id === found.lab.id && t.join_code === (code ?? '').trim().toUpperCase(),
       )
       if (!team) return err(404, 'invalid_code', 'Código no válido.')
-      if (myTeam(found.lab.id, user.id)) return err(409, 'already_in_team', 'Ya tiene equipo.')
+      if (myTeam(found.lab.id, user.id)) return err(409, 'already_in_team', 'Ya tienes equipo.')
       if (team.locked) return err(409, 'team_locked', 'Equipo fijado.')
       const max = found.lab.max_team_size
       if (max && team.member_ids.length >= max) return err(409, 'team_full', 'Equipo completo.')
@@ -611,8 +611,8 @@ export const courseHandlers = [
       if (found.lab.team_mode !== 'team')
         return validation({ name: 'Este laboratorio es individual.' })
       const { name } = (await request.json()) as { name?: string }
-      if (!name?.trim()) return validation({ name: 'Escriba el nombre del equipo.' })
-      if (myTeam(found.lab.id, user.id)) return err(409, 'already_in_team', 'Ya tiene equipo.')
+      if (!name?.trim()) return validation({ name: 'Escribe el nombre del equipo.' })
+      if (myTeam(found.lab.id, user.id)) return err(409, 'already_in_team', 'Ya tienes equipo.')
       const team: MTeam = {
         id: newId('tm'),
         lab_id: found.lab.id,
@@ -689,7 +689,7 @@ export const courseHandlers = [
       if (lab.team_mode === 'team' && !team) return err(409, 'team_required', 'Necesita un equipo.')
       const body = (await request.json()) as SubmissionInput
       const project = lookupProject(body.project_id, user.id)
-      if (!project) return validation({ project_id: 'Elija uno de sus proyectos.' })
+      if (!project) return validation({ project_id: 'Elige uno de tus proyectos.' })
       const versionId = body.version_id ?? project.versions[project.versions.length - 1]?.id
       if (!versionId || !project.versions.some((v) => v.id === versionId))
         return validation({ version_id: 'La versión no existe.' })
@@ -767,7 +767,7 @@ export const courseHandlers = [
         grade = check.value
       }
       if (grade === null && !body.comment?.trim() && !body.return_for_resubmission)
-        return validation({ comment: 'Escriba un comentario.' })
+        return validation({ comment: 'Escribe un comentario.' })
       const r = {
         id: newId('rv'),
         submission_id: s.id,
