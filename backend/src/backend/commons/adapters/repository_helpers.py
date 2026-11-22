@@ -61,7 +61,7 @@ def insert_with_id_retry[RowT: _HumanFriendlyIdRow](session: Session, row: RowT)
                 raise exceptions.ConflictError(
                     f"Could not generate a unique id for [{table_name}] after "
                     f"{_MAX_ID_COLLISION_RETRIES} attempts.",
-                    code="ID_COLLISION",
+                    code="id_collision",
                     retriable=True,
                 ) from exc
             row.id = value_objects.HumanFriendlyId.new().value

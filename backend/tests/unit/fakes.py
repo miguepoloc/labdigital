@@ -1,70 +1,107 @@
-"""Shared building blocks for domain/service unit tests — ARCHITECTURE.md §15,
-`shared-kernel-and-testing.md`. `FakeUnitOfWork` implements the subset of the real
-`unit_of_work.UnitOfWork`'s public surface `services/*.py` and the orchestrators actually
-call (`.transaction()`, `.repo(...)`, `.audit`, `.outbox`) without ever opening a real
-SQLAlchemy `Session` — what makes those functions testable in milliseconds, no Postgres
-required (ARCHITECTURE.md §15's "Fakes, not mocks" row).
+"""Piezas compartidas para tests unitarios — ARCHITECTURE.md §15 ("fakes, no mocks").
 
-Not checked by `mypy src` — the Makefile's `typecheck` target (and this repo's CI) only
-type-checks `src/`, matching `pyproject.toml`'s `testpaths = ["tests"]` staying separate
-from `[tool.hatch.build.targets.wheel] packages = ["src/backend"]`. `FakeUnitOfWork` is
-therefore a plain duck-typed stand-in, not a subclass of `UnitOfWork` (that class's
-`__init__` requires a `sessionmaker[Session]` and its own `.session` property is meant to
-raise outside a transaction — inheriting it would mean overriding away everything
-session-shaped rather than reusing anything, the same "don't override away unwanted
-behavior" reasoning `commons.domain.entities.Entity` is kept minimal for,
-`anti-patterns-and-design-principles.md` §22.1's Refused Bequest entry)."""
+`FakeUnitOfWork` imita la superficie pública de `unit_of_work.UnitOfWork` que usan los
+servicios (`transaction()`, `repo()`, `audit`, `outbox`, `rate_limits`) sin Postgres. Las
+transacciones del fake no hacen rollback: los tests sólo afirman sobre lo que un servicio
+deja confirmado, y los casos de rollback real se cubren en integración."""
 
 from collections.abc import Generator
 import contextlib
 from typing import Any
 
-from backend.commons.domain import aggregates, audit, events, repositories
+from backend.commons.domain import (
+    aggregates,
+    audit,
+    events,
+    rate_limits,
+    repositories,
+    value_objects,
+)
 
 
 class FakeOutbox:
-    """Stands in for the real `OutboxRepository` (commons/adapters/outbox.py) — a
-    `Fake<Aggregate>Repository.add`/`.update` drains `entity.pull_events()` into this
-    directly, the same tail every real repository's `add`/`update` runs through
-    `repository_helpers.publish_events`, just with no session behind it."""
-
     def __init__(self) -> None:
         self.recorded: list[events.DomainEvent] = []
 
     def record(self, event: events.DomainEvent) -> None:
         self.recorded.append(event)
 
+    def of_type(self, event_type: type[events.DomainEvent]) -> list[Any]:
+        return [e for e in self.recorded if isinstance(e, event_type)]
+
 
 def drain_events(entity: aggregates.AggregateRoot[Any], outbox: FakeOutbox) -> None:
-    """Call from every `Fake<Aggregate>Repository.add`/`.update` — mirrors
-    `repository_helpers.publish_events`, so a unit test can assert on `outbox.recorded`
-    exactly the way an integration test asserts on the real `outbox_events` table rows."""
     for event in entity.pull_events():
         outbox.record(event)
 
 
 class FakeAuditRepository:
-    """Stands in for `commons.adapters.audit.AuditRepository` — same `.add` signature, no
-    session, no `list_for_aggregate` (nothing under test reads it back yet)."""
-
     def __init__(self) -> None:
         self.entries: list[audit.AuditEntry] = []
 
     def add(self, entry: audit.AuditEntry) -> None:
         self.entries.append(entry)
 
+    def actions(self) -> list[str]:
+        return [e.action for e in self.entries]
+
+
+class FakeRateLimits:
+    """Ventana fija como `RateLimitRepository` (respeta `time_machine`)."""
+
+    def __init__(self) -> None:
+        self.hits: dict[str, int] = {}
+
+    def hit(self, rule: rate_limits.RateLimitRule, key: str) -> int | None:
+        now = value_objects.PosixTime.now().microseconds // 1_000_000
+        window_start = now - now % rule.window_seconds
+        bucket = f"{rule.name}:{key}:{window_start}"
+        self.hits[bucket] = self.hits.get(bucket, 0) + 1
+        if self.hits[bucket] > rule.limit:
+            return max(1, window_start + rule.window_seconds - now)
+        return None
+
+
+class FakeBackoff:
+    """Misma semántica que `BackoffRepository`, en memoria (respeta `time_machine`)."""
+
+    def __init__(self) -> None:
+        self.rows: dict[str, tuple[int, int, int]] = {}  # failures, last_failure, blocked_until
+
+    @staticmethod
+    def _now() -> int:
+        return value_objects.PosixTime.now().microseconds // 1_000_000
+
+    def retry_after(self, rule: rate_limits.BackoffRule, key: str) -> int | None:
+        row = self.rows.get(f"{rule.name}:{key}")
+        now = self._now()
+        if row is None or row[2] <= now:
+            return None
+        return row[2] - now
+
+    def record_failure(self, rule: rate_limits.BackoffRule, key: str) -> int:
+        bucket, now = f"{rule.name}:{key}", self._now()
+        failures, last, _ = self.rows.get(bucket, (0, now, 0))
+        failures = 1 if now - last > rule.reset_after_seconds else failures + 1
+        delay = rule.delay_after(failures)
+        self.rows[bucket] = (failures, now, now + delay)
+        return delay
+
+    def reset(self, rule: rate_limits.BackoffRule, key: str) -> None:
+        self.rows.pop(f"{rule.name}:{key}", None)
+
 
 class FakeUnitOfWork:
-    """Constructed with the fake repositories a test needs, keyed by aggregate type — the
-    same registry shape `unit_of_work.register_repo` builds for the real one at import time,
-    just supplied directly instead. One `FakeOutbox`/`FakeAuditRepository` per instance
-    (not re-created per `.audit`/`.outbox` access like the real property does per-session) —
-    stable objects a test can assert against after the fact."""
-
-    def __init__(self, repos: dict[type[aggregates.AggregateRoot[Any]], Any]) -> None:
-        self._repos = repos
+    def __init__(self, repos: dict[type[aggregates.AggregateRoot[Any]], Any] | None = None) -> None:
+        self._repos: dict[type[aggregates.AggregateRoot[Any]], Any] = repos or {}
         self.outbox = FakeOutbox()
         self.audit = FakeAuditRepository()
+        self.rate_limits = FakeRateLimits()
+        self.backoff = FakeBackoff()
+        self.transactions = 0
+
+    def register(self, aggregate_type: type[aggregates.AggregateRoot[Any]], repo: Any) -> None:
+        self._repos[aggregate_type] = repo
 
     def repo[T: aggregates.AggregateRoot[Any]](
         self, aggregate_type: type[T]
@@ -73,7 +110,6 @@ class FakeUnitOfWork:
 
     @contextlib.contextmanager
     def transaction(self, *, idempotency_key: str | None = None) -> Generator[None]:
-        del idempotency_key  # no idempotency table to collide against in-memory — real
-        # idempotency-key rejection is integration-test territory (ARCHITECTURE.md
-        # §12.1/§12.2's unique-constraint mechanism), not what this fake exists to cover.
+        del idempotency_key
+        self.transactions += 1
         yield

@@ -1,16 +1,18 @@
+# Sólo para desarrollo local (Postgres). El despliegue real vive en deploy/ (LD-11).
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
+    container_name: ld-dev-postgres
     environment:
-      - POSTGRES_USER=backend
-      - POSTGRES_PASSWORD=backend
-      - POSTGRES_DB=backend
+      - POSTGRES_USER=labdigital
+      - POSTGRES_PASSWORD=labdigital
+      - POSTGRES_DB=labdigital
     ports:
-      - "5432:5432"
+      - "127.0.0.1:18432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U backend"]
+      test: ["CMD-SHELL", "pg_isready -U labdigital"]
       interval: 2s
       timeout: 5s
       retries: 10

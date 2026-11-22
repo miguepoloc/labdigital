@@ -1,13 +1,35 @@
 from typing import Self
 
 from backend.commons.application import dto
+from backend.commons.domain import value_objects as base_value_objects
 from backend.identity.users.domain.model import aggregate
 
 
-class RegisterUserInputDTO(dto.BaseDTO):
+def iso(value: base_value_objects.PosixTime) -> str:
+    return value.to_datetime().isoformat().replace("+00:00", "Z")
+
+
+class UsersConfig(dto.BaseDTO):
+    """Configuración que el caso de uso necesita y que la entrypoint (raíz de composición)
+    saca de `Settings` — así los servicios no leen el entorno y los tests la fijan."""
+
+    public_base_url: str
+    admin_emails: frozenset[str] = frozenset()
+    data_policy_version: str
+
+
+class RequestContext(dto.BaseDTO):
+    """Datos de la petición que importan para auditoría y rate limiting."""
+
+    ip: str
+    user_agent: str = ""
+
+
+class RegisterInputDTO(dto.BaseDTO):
     email: str
     full_name: str
     password: str
+    accept_data_policy: bool
 
 
 class LoginInputDTO(dto.BaseDTO):
@@ -15,45 +37,102 @@ class LoginInputDTO(dto.BaseDTO):
     password: str
 
 
-class RefreshInputDTO(dto.BaseDTO):
-    refresh_token: str
+class TokenInputDTO(dto.BaseDTO):
+    token: str
 
 
-class DeactivateUserInputDTO(dto.BaseDTO):
-    user_id: str
+class EmailInputDTO(dto.BaseDTO):
+    email: str
 
 
-class TokenPairOutputDTO(dto.BaseDTO):
-    access_token: str
-    refresh_token: str
+class ResetPasswordInputDTO(dto.BaseDTO):
+    token: str
+    password: str
 
 
-class UserOutputDTO(dto.BaseDTO):
+class UpdateMeInputDTO(dto.BaseDTO):
+    full_name: str
+
+
+class ChangePasswordInputDTO(dto.BaseDTO):
+    current: str
+    new: str
+
+
+class MeOutputDTO(dto.BaseDTO):
+    """`Me` del contrato §4."""
+
     id: str
     email: str
     full_name: str
-    is_active: bool
+    role: str
+    email_verified: bool
+    created_at: str
 
     @classmethod
     def from_entity(cls, user: aggregate.User) -> Self:
         return cls(
             id=str(user.id),
             email=user.email.value,
-            full_name=user.full_name,
-            is_active=user.is_active,
+            full_name=user.full_name.value,
+            role=user.role.value,
+            email_verified=user.is_email_verified,
+            created_at=iso(user.created_at),
         )
 
 
-class UserProfileOutputDTO(dto.BaseDTO):
-    """Returned by entrypoints/web/internal.py — ARCHITECTURE.md §9.2. Deliberately a
-    separate DTO from UserOutputDTO: this one is the public *inter-service* contract
-    (§10.2b), so it stays intentionally narrow (only what orders needs to snapshot) rather
-    than mirroring every field User happens to have."""
+class TokenClaimsOutputDTO(dto.BaseDTO):
+    """Lo que `sessions`/el orquestador necesitan para emitir un access."""
 
     user_id: str
     email: str
     full_name: str
+    role: str
+    credentials_version: int
+    is_active: bool
 
     @classmethod
     def from_entity(cls, user: aggregate.User) -> Self:
-        return cls(user_id=str(user.id), email=user.email.value, full_name=user.full_name)
+        return cls(
+            user_id=str(user.id),
+            email=user.email.value,
+            full_name=user.full_name.value,
+            role=user.role.value,
+            credentials_version=user.credentials_version,
+            is_active=user.is_active,
+        )
+
+
+class AuthenticatedUserOutputDTO(dto.BaseDTO):
+    me: MeOutputDTO
+    claims: TokenClaimsOutputDTO
+
+
+class PersonOutputDTO(dto.BaseDTO):
+    """Nombre y correo para mostrar a otros usuarios del mismo curso (directorio)."""
+
+    id: str
+    full_name: str
+    email: str
+
+
+class AdminUserOutputDTO(dto.BaseDTO):
+    id: str
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    email_verified: bool
+    created_at: str
+
+    @classmethod
+    def from_entity(cls, user: aggregate.User) -> Self:
+        return cls(
+            id=str(user.id),
+            email=user.email.value,
+            full_name=user.full_name.value,
+            role=user.role.value,
+            is_active=user.is_active,
+            email_verified=user.is_email_verified,
+            created_at=iso(user.created_at),
+        )

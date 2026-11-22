@@ -61,9 +61,22 @@ class AuditLogOrm(Base):
 
 class OutboxEventOrm(Base):
     """ARCHITECTURE.md §11.2 — the Transactional Outbox. Written in the same transaction
-    as the aggregate mutation; a separate relay reads unpublished rows and publishes."""
+    as the aggregate mutation; el worker de proceso (`backend.entrypoints.worker`) lee las
+    filas pendientes y las despacha (hoy: correos por SMTP).
+
+    `next_attempt_at` hace de *lease*: al reclamar una fila se empuja al futuro, de modo que
+    dos workers no la procesan a la vez y, si el worker muere a mitad, la fila vuelve a estar
+    disponible al vencer. `attempts`/`last_error`/`failed_at` dan reintentos con espera
+    creciente y un estado terminal visible."""
 
     __tablename__ = "outbox_events"
+    __table_args__ = (
+        sa.Index(
+            "ix_outbox_events_pending",
+            "next_attempt_at",
+            postgresql_where=sa.text("published_at IS NULL AND failed_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     event_type: Mapped[str] = mapped_column(sa.Text, nullable=False)
@@ -71,3 +84,33 @@ class OutboxEventOrm(Base):
     idempotence_key: Mapped[str] = mapped_column(sa.Text, unique=True, nullable=False)
     created_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
     published_at: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
+    attempts: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    failed_at: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
+
+
+class RateLimitOrm(Base):
+    """Contadores de ventana fija para el rate limiting (contrato §6 `rate_limited`). En
+    Postgres y no en memoria: la API corre con varios workers de uvicorn y los límites deben
+    ser globales y sobrevivir a reinicios. `bucket` = `<regla>:<clave>`, `window_start` en
+    segundos POSIX alineados a la ventana."""
+
+    __tablename__ = "rate_limits"
+
+    bucket: Mapped[str] = mapped_column(sa.Text, primary_key=True)
+    window_start: Mapped[int] = mapped_column(sa.BigInteger, primary_key=True)
+    hits: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    expires_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, index=True)
+
+
+class BackoffCounterOrm(Base):
+    """Fallos consecutivos por clave (`<regla>:<clave>`) para el retardo creciente del login
+    (`commons.domain.rate_limits.BackoffRule`). Segundos POSIX."""
+
+    __tablename__ = "backoff_counters"
+
+    bucket: Mapped[str] = mapped_column(sa.Text, primary_key=True)
+    failures: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    last_failure_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False, index=True)
+    blocked_until: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)

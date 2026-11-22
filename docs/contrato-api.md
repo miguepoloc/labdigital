@@ -105,8 +105,9 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
 - `next` es siempre la ruta completa con prefijo (`/labdigital/app/...`, `/labdigital/fpga/...`).
 - **Revisión de autosave** (tras LD-3): `Project` y la respuesta de `PUT /projects/{id}/autosave` incluyen `revision`
   (entero que sube en CADA guardado, también cuando el autosave sobrescribe la versión abierta). El autosave envía
-  `{content, base_version, base_revision}`; si `base_revision` ≠ la actual ⇒ 409 `version_conflict` con
-  `details: {current_version, current_revision}`.
+  `{content, base_version, base_revision}` (`base_version` = el **número `n`** entero de la versión actual, no su id);
+  si no son los actuales ⇒ 409 `version_conflict` con `details: {current_version (n), current_revision,
+  current_version_id}`.
 - **Refresh concurrente**: reusar el refresh recién rotado dentro de **10 s** no revoca la familia (devuelve 204 con
   cookies nuevas de la misma familia); fuera de esa ventana sí (robo). El frontend además serializa la renovación entre
   pestañas con `navigator.locks.request("ld-refresh", …)` (si no existe, el candado por pestaña).
@@ -130,6 +131,13 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
   `grade` es la de la última revisión con nota. En `pass_fail`, la nota es `1` (aprobado) o `0` (no aprobado).
 - **Códigos 409 nuevos**: `deadline_passed`, `already_member`, `team_full`, `team_locked`, `already_in_team`,
   `team_required`, `resubmission_not_allowed`, `lab_not_open`; `invalid_code` es 404.
+- **Precisiones de LD-4/5/6** (backend fase 2): `X-LabDigital-Email` y `X-LabDigital-Name` van URL-encoded.
+  Códigos 409 adicionales: `lab_published`, `course_archived`, `cannot_modify_self`, `invalid_transition`,
+  `not_in_team`, `not_team_lab`. `GET /labs/{id}/submissions` devuelve `Submission` **sin `content`** (con
+  `files` y `reviews`, para el historial de intentos). `Submission` incluye además `project_name`. `POST /labs/{id}/teams` devuelve el `Team` completo. `POST /files` es multipart con
+  campos `file` y `kind`; `PUT /teams/{id}/members` recibe una lista JSON de ids de usuario (`["uuid", …]`).
+- **Sesión en cada petición privada**: toda ruta autenticada (salvo `GET /auth/verify`) comprueba en BD que `sid`
+  sigue activa y que `ver` coincide; un access robado muere al cerrar sesión, revocar, cambiar contraseña o desactivar.
 - **Cookie indicadora** `ld_session=1` (NO HttpOnly, `Secure; SameSite=Lax; Path=/labdigital/`, misma vida que
   `ld_refresh`): se pone en login/refresh y se borra en logout o al revocar. Sólo evita que páginas públicas pidan
   `/me` sin sesión; nunca se usa para autorizar.

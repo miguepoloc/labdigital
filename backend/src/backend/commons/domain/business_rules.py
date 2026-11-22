@@ -16,4 +16,4 @@ class BusinessRule(abc.ABC):
 
     def check(self) -> None:
         if self.is_broken():
-            raise exceptions.ValidationError(self.message(), code="BUSINESS_RULE_VIOLATION")
+            raise exceptions.ValidationError(self.message(), code="validation_error")
