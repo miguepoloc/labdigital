@@ -30,9 +30,11 @@ def test_html_is_email_safe_shell(name: str, message: mail.EmailMessage) -> None
     body = message.html
     assert '<html lang="es"' in body
     assert '<meta name="color-scheme" content="light dark">' in body
-    assert 'class="ld-preheader"' in body and "display:none" in body
+    assert 'class="ld-preheader"' in body
+    assert "display:none" in body
     assert "max-width:600px" in body
-    assert "LabDigital" in body and "GIDEAM · Universidad del Magdalena" in body
+    assert "LabDigital" in body
+    assert "GIDEAM · Universidad del Magdalena" in body
     assert "https://www.unimagdalena.edu.co/Content/Public/Docs/ManualProteccionDeDatos.pdf" in body
     assert 'href="https://gideam.unimagdalena.edu.co/labdigital/"' in body
     assert "Correo automático, no respondas a este mensaje." in body
@@ -51,7 +53,8 @@ def test_link_is_escaped_in_html_and_raw_in_text(name: str, message: mail.EmailM
 def test_cta_button_points_to_link() -> None:
     message = emails.verification(to="a@x.co", full_name="Ada", link=_LINK)
     cta = re.search(r'<a href="([^"]+)"[^>]*>Confirmar mi correo</a>', message.html)
-    assert cta and cta.group(1) == _ESCAPED_LINK
+    assert cta is not None
+    assert cta.group(1) == _ESCAPED_LINK
 
 
 def test_name_is_escaped() -> None:
@@ -77,7 +80,8 @@ def test_already_registered_has_both_actions() -> None:
     )
     assert re.search(r'<a href="https://l/entrar"[^>]*>Entrar</a>', message.html)
     assert re.search(r'<a href="https://l/recuperar"[^>]*>Recuperar contraseña</a>', message.html)
-    assert "https://l/entrar" in message.text and "https://l/recuperar" in message.text
+    assert "https://l/entrar" in message.text
+    assert "https://l/recuperar" in message.text
 
 
 def test_token_still_extractable_from_text() -> None:

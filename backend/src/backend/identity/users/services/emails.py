@@ -83,8 +83,12 @@ def _preheader(text: str) -> str:
 def _led_strip() -> str:
     cells = []
     for i in range(16):
-        on = i in _LEDS_ON
-        color = (_ORANGE_300 if i % 2 else _LED_GREEN) if on else _BLUE_800
+        if i not in _LEDS_ON:
+            color = _BLUE_800
+        elif i % 2:
+            color = _ORANGE_300
+        else:
+            color = _LED_GREEN
         if i:
             cells.append('<td width="10" style="font-size:0;line-height:0">&nbsp;</td>')
         cells.append(
