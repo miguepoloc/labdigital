@@ -41,3 +41,18 @@ class MembershipOrm(orm_base.Base, orm_base.TimestampsMixin):
     version: Mapped[int] = mapped_column(default=0)
 
     __mapper_args__ = {"version_id_col": version}
+
+
+class JoinNoticeOrm(orm_base.Base):
+    """Último aviso por correo de solicitudes de inscripción enviado a cada docente de un
+    curso: anti-spam del worker (como mucho un correo por docente y curso por ventana)."""
+
+    __tablename__ = "course_join_notices"
+
+    course_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True
+    )
+    recipient_id: Mapped[uuid.UUID] = mapped_column(
+        sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    last_sent_at: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)

@@ -20,7 +20,7 @@ Despliegue en Docker siempre encendido (uvicorn); sin Lambda/Mangum/SNS/SQS.
 | `files/blobs/` | Agregado `Blob` + almacenamiento en disco direccionado por SHA-256 (`BLOB_DIR`) |
 | `orchestrators/ports.py` | Adaptadores de los puertos entre productos (directorio de usuarios, congelar proyecto, archivos, acceso a blobs) |
 | `entrypoints/web/app.py` | App FastAPI única (`root_path=/labdigital/api`, rutas bajo `/v1`) |
-| `entrypoints/worker/main.py` | Worker: outbox → correo SMTP (con reintentos) + limpieza horaria |
+| `entrypoints/worker/main.py` | Worker: outbox → correo SMTP (con reintentos), avisos de inscripción de `teaching` + limpieza horaria |
 
 Contratos import-linter en `.importlinter` (pureza de dominio, capas, independencia
 users/sessions, de los subcontextos de teaching y de los productos identity/projects/teaching/
@@ -59,6 +59,12 @@ contra un SMTP local (aiosmtpd).
 - **Outbox con lease**: el worker reclama filas (`FOR UPDATE SKIP LOCKED` + `next_attempt_at`),
   envía sin transacción abierta y marca entregado; reintentos con espera exponencial
   (8 intentos). Tras enviar, el cuerpo del correo (con el enlace/token) se borra del payload.
+- **Avisos de inscripción (LD-17)**: `JoinRequested`/`MembershipStatusChanged` (ya en el outbox con la
+  membresía) los traduce el worker (`teaching/services/notifications_orchestrator.py`) en `EmailRequested`
+  por destinatario, que vuelven al outbox y entrega el handler de correo de siempre. Anti-spam: un correo
+  por docente y curso cada 10 min (`course_join_notices`, `INSERT … ON CONFLICT … WHERE` atómico); las
+  solicitudes dentro de la ventana cuentan en el «N pendientes» del siguiente. La maquetación HTML común
+  vive en `commons/application/email_layout.py`.
 - **Refresh**: `remember=false` ⇒ cookie de sesión y caducidad en servidor de 24 h sin uso;
   `remember=true` ⇒ 30 días deslizantes. Reuso de un refresh rotado ⇒ sesión revocada + auditoría.
 - **`ver`**: `GET /me` y el refresh rechazan (401) si cambió `credentials_version`;
