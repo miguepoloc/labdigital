@@ -7,9 +7,7 @@ import LdThemeToggle from './LdThemeToggle.vue'
 
 export interface NavItem {
   label: string
-  to?: RouteLocationRaw
-  /** Elemento visible pero aún no disponible ("Pronto"). */
-  soon?: boolean
+  to: RouteLocationRaw
 }
 
 const props = defineProps<{
@@ -142,12 +140,9 @@ onBeforeUnmount(() => {
       <nav :id="drawerId" class="ld-shell__nav" :aria-label="t('nav.main')">
         <ul>
           <li v-for="item in nav" :key="item.label">
-            <RouterLink v-if="item.to && !item.soon" class="ld-shell__nav-link" :to="item.to">
+            <RouterLink class="ld-shell__nav-link" :to="item.to">
               {{ item.label }}
             </RouterLink>
-            <span v-else class="ld-shell__nav-link is-soon" aria-disabled="true">
-              {{ item.label }} <small class="ld-shell__soon">{{ t('nav.soon') }}</small>
-            </span>
           </li>
         </ul>
       </nav>
@@ -380,17 +375,6 @@ a.ld-shell__nav-link.router-link-exact-active {
   background: color-mix(in srgb, var(--ld-color-primary) 14%, transparent);
   color: var(--ld-color-primary);
   box-shadow: inset 3px 0 0 var(--ld-color-primary);
-}
-
-.ld-shell__nav-link.is-soon {
-  color: var(--ld-color-text-muted);
-}
-
-.ld-shell__soon {
-  font-size: var(--ld-text-xs);
-  padding: 0 var(--ld-space-2);
-  border-radius: var(--ld-radius-full);
-  background: var(--ld-color-surface-2);
 }
 
 .ld-shell__main {
