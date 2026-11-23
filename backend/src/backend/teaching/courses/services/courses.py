@@ -7,19 +7,26 @@ recibe el `Viewer` del access verificado.
   un estudiante del curso ⇒ 403 `forbidden`.
 """
 
+import datetime
 import typing
 import uuid
 
 from backend.commons.adapters import unit_of_work
 from backend.commons.domain import audit
 from backend.commons.domain import exceptions as commons_exceptions
+from backend.commons.domain import value_objects as base_value_objects
 from backend.teaching.commons import dto as teaching_dto
 from backend.teaching.commons import value_objects as teaching_value_objects
 from backend.teaching.courses.adapters import repository
-from backend.teaching.courses.domain.model import aggregate, exceptions, value_objects
+from backend.teaching.courses.domain.model import aggregate, events, exceptions, value_objects
 from backend.teaching.courses.services import dto
 
 _VISIBLE_STATUSES = (value_objects.MembershipStatus.PENDING, value_objects.MembershipStatus.ACTIVE)
+
+# Tipos de evento del outbox que el worker convierte en avisos por correo (el nombre sale de
+# la clase, §11.1: nunca una cadena paralela).
+JOIN_REQUESTED_EVENT = events.JoinRequested.__name__
+MEMBERSHIP_STATUS_CHANGED_EVENT = events.MembershipStatusChanged.__name__
 
 
 def create_course(
@@ -228,7 +235,81 @@ def list_active_student_ids(*, uow: unit_of_work.UnitOfWork, course_id: str) -> 
     return [str(m.user_id) for m in members]
 
 
+def join_request_notice(
+    *, uow: unit_of_work.UnitOfWork, payload: dict[str, typing.Any]
+) -> dto.MembershipNoticeDTO | None:
+    """Para el worker (sin autorización): datos del aviso de un `JoinRequested`, o `None` si
+    ya no procede avisar (la solicitud dejó de estar pendiente, el curso se archivó o se
+    borró)."""
+    event = events.JoinRequested.model_validate(payload)
+    return _notice(uow, event.course_id, event.user_id, value_objects.MembershipStatus.PENDING)
+
+
+def approval_notice(
+    *, uow: unit_of_work.UnitOfWork, payload: dict[str, typing.Any]
+) -> dto.MembershipNoticeDTO | None:
+    """Para el worker: datos del aviso «ya estás en el curso» de un `MembershipStatusChanged`
+    a `active`, o `None` si el cambio es otro o el estudiante ya no está activo."""
+    event = events.MembershipStatusChanged.model_validate(payload)
+    if event.new_status is not value_objects.MembershipStatus.ACTIVE:
+        return None
+    return _notice(uow, event.course_id, event.user_id, value_objects.MembershipStatus.ACTIVE)
+
+
+def claim_join_notices(
+    *,
+    uow: unit_of_work.UnitOfWork,
+    course_id: str,
+    teacher_ids: list[str],
+    window: datetime.timedelta,
+) -> set[str]:
+    """Anti-spam: de `teacher_ids`, los que pueden recibir ya un aviso de solicitudes de este
+    curso (ninguno en la última `window`); queda anotado en la misma transacción que el
+    llamador (que registra los correos en el outbox)."""
+    now = base_value_objects.PosixTime.now().microseconds
+    refs = [r for r in (teaching_value_objects.UserRef.parse(t) for t in teacher_ids) if r]
+    with uow.transaction():
+        return repository.JoinNoticeRepository(uow.session).claim(
+            _course_id(course_id),
+            refs,
+            now=now,
+            cutoff=now - int(window.total_seconds() * 1_000_000),
+        )
+
+
 # --------------------------------------------------------------------------------------
+
+
+def _notice(
+    uow: unit_of_work.UnitOfWork,
+    course_id: teaching_value_objects.CourseId,
+    student_id: teaching_value_objects.UserRef,
+    expected: value_objects.MembershipStatus,
+) -> dto.MembershipNoticeDTO | None:
+    with uow.transaction():
+        try:
+            course = _courses(uow).get(course_id)
+        except exceptions.CourseNotFoundError:
+            return None
+        repo = _memberships(uow)
+        membership = repo.find(course.id, student_id)
+        if course.is_archived or membership is None or membership.is_teacher:
+            return None
+        if membership.status is not expected:
+            return None
+        teachers = repo.list_for_course(
+            course.id,
+            status=value_objects.MembershipStatus.ACTIVE,
+            role=value_objects.MembershipRole.DOCENTE,
+        )
+        return dto.MembershipNoticeDTO(
+            course_id=str(course.id),
+            course_name=course.name.value,
+            period=course.period.value,
+            student_id=str(student_id),
+            teacher_ids=[str(t.user_id) for t in teachers],
+            pending=repo.count(course.id, value_objects.MembershipStatus.PENDING),
+        )
 
 
 def _view(

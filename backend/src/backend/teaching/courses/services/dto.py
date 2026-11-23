@@ -91,3 +91,16 @@ class MembershipOutputDTO(dto.BaseDTO):
             requested_at=teaching_dto.iso(membership.created_at) or "",
             updated_at=teaching_dto.iso(membership.updated_at) or "",
         )
+
+
+class MembershipNoticeDTO(dto.BaseDTO):
+    """Lo que necesita el worker para avisar por correo de una solicitud o una aprobación,
+    leído en el momento de avisar (no del evento): curso, estudiante, docentes activos del
+    curso y solicitudes pendientes."""
+
+    course_id: str
+    course_name: str
+    period: str
+    student_id: str
+    teacher_ids: list[str]
+    pending: int
