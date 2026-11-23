@@ -377,7 +377,7 @@ describe('Revisión del docente', () => {
     wrapper.unmount()
   })
 
-  it('equipos del lab: fijar y reasignar', async () => {
+  it('equipos del lab: fijar y mover integrantes', async () => {
     signIn(DOCENTE_EMAIL)
     const { wrapper } = await renderAt(`/app/labs/${IDS.lab2}`)
     await wrapper.find('[data-test="tab-teams"]').trigger('click')
@@ -386,13 +386,12 @@ describe('Revisión del docente', () => {
     await wrapper.find('[data-test="team-lock"]').trigger('click')
     await settle()
     expect(cdb.teams.find((tm) => tm.id === IDS.teamFF)!.locked).toBe(true)
-    // Reasignar: Sofía pasa a Los Flip-Flops
-    await wrapper.findAll('[data-test="team-reassign"]')[0]!.trigger('click')
+    // Mover: Sofía pasa a Los Flip-Flops (aunque esté fijado: lo hace el docente)
     const sofia = wrapper
-      .findAll('input[type="checkbox"]')
-      .find((c) => c.element.parentElement?.textContent?.includes('Sofía'))!
-    await sofia.setValue(true)
-    await wrapper.find('[data-test="team-save-members"]').trigger('click')
+      .findAll('[data-test="team-member"]')
+      .find((li) => li.text().includes('Sofía'))!
+    await sofia.find('[data-test="move-select"]').setValue(IDS.teamFF)
+    await sofia.find('[data-test="move-submit"]').trigger('click')
     await settle()
     expect(cdb.teams.find((tm) => tm.id === IDS.teamFF)!.member_ids).toHaveLength(3)
     expect(cdb.teams.find((tm) => tm.id === IDS.teamCMP)!.member_ids).toHaveLength(0)

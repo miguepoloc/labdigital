@@ -87,6 +87,74 @@ function myTeam(labId: string, userId: string): MTeam | undefined {
   return cdb.teams.find((t) => t.lab_id === labId && t.member_ids.includes(userId))
 }
 
+/** Estudiantes activos del curso sin equipo en el lab. */
+function unassignedIds(courseId: string, labId: string): string[] {
+  const assigned = new Set(
+    cdb.teams.filter((tm) => tm.lab_id === labId).flatMap((tm) => tm.member_ids),
+  )
+  return cdb.memberships
+    .filter(
+      (m) =>
+        m.course_id === courseId &&
+        m.role === 'estudiante' &&
+        m.status === 'active' &&
+        !assigned.has(m.user_id),
+    )
+    .map((m) => m.user_id)
+}
+function teamNameTaken(labId: string, name: string, exceptId?: string): boolean {
+  const key = name.toLocaleLowerCase('es')
+  return cdb.teams.some(
+    (tm) => tm.lab_id === labId && tm.id !== exceptId && tm.name.toLocaleLowerCase('es') === key,
+  )
+}
+function newTeam(labId: string, name: string, memberIds: string[]): MTeam {
+  return {
+    id: newId('tm'),
+    lab_id: labId,
+    name,
+    join_code: genCode(),
+    locked: false,
+    member_ids: memberIds,
+  }
+}
+/** Lab en equipo del que `userId` es docente; si no, la respuesta de error. */
+function teacherTeamLab(labId: unknown, userId: string) {
+  const found = labOf(labId)
+  if (!found) return notFound()
+  if (found.course.owner_id !== userId) return forbidden()
+  if (found.lab.team_mode !== 'team')
+    return err(409, 'not_team_lab', 'Este laboratorio es individual.')
+  return found
+}
+/** Equipo de un lab del que `userId` es docente; si no, la respuesta de error. */
+function teacherTeam(teamId: unknown, userId: string) {
+  const team = cdb.teams.find((tm) => tm.id === teamId)
+  const found = team ? labOf(team.lab_id) : null
+  if (!team || !found) return notFound()
+  if (found.course.owner_id !== userId) return forbidden()
+  return team
+}
+function createTeacherTeam(
+  found: { lab: MLab; course: MCourse },
+  name: string,
+  memberIds: string[],
+  userId: string,
+) {
+  const ids = [...new Set(memberIds)]
+  if (ids.some((id) => roleIn(found.course, id) !== 'estudiante'))
+    return validation({ members: 'Sólo estudiantes activos del curso.' })
+  const max = found.lab.max_team_size ?? 0
+  if (ids.length > max) return validation({ members: `Máximo ${max} integrantes.` })
+  if (teamNameTaken(found.lab.id, name)) return err(409, 'team_name_taken', 'Nombre repetido.')
+  const taken = ids.filter((id) => myTeam(found.lab.id, id))
+  if (taken.length)
+    return err(409, 'already_in_team', 'Ya están en otro equipo.', { members: taken })
+  const team = newTeam(found.lab.id, name, ids)
+  cdb.teams.push(team)
+  return HttpResponse.json(toTeam(team, userId, true), { status: 201 })
+}
+
 // ---- Serialización ----
 
 function toCourse(c: MCourse, userId: string) {
@@ -602,27 +670,107 @@ export const courseHandlers = [
     }),
   ),
 
+  http.get(
+    `${A}/labs/:id/teams/unassigned`,
+    authed(({ params, user }) => {
+      const found = labOf(params.id)
+      if (!found) return notFound()
+      if (found.course.owner_id !== user.id) return forbidden()
+      return HttpResponse.json(
+        unassignedIds(found.course.id, found.lab.id)
+          .map((id) => ({ id, full_name: userById(id)?.full_name ?? '' }))
+          .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es')),
+      )
+    }),
+  ),
+
+  http.post(
+    `${A}/labs/:id/teams/bulk`,
+    authed(async ({ params, request, user }) => {
+      const found = teacherTeamLab(params.id, user.id)
+      if (found instanceof Response) return found
+      const { count, prefix = 'Pareja' } = (await request.json()) as {
+        count?: number
+        prefix?: string
+      }
+      if (!Number.isInteger(count) || count! < 1 || count! > 60)
+        return validation({ count: 'Entre 1 y 60.' })
+      if (!prefix.trim()) return validation({ prefix: 'Escribe el prefijo.' })
+      const created: MTeam[] = []
+      for (let i = 1; i <= count!; i++) {
+        const name = `${prefix.trim()} ${i}`
+        if (teamNameTaken(found.lab.id, name)) continue
+        const team = newTeam(found.lab.id, name, [])
+        cdb.teams.push(team)
+        created.push(team)
+      }
+      return HttpResponse.json(
+        created.map((tm) => toTeam(tm, user.id, true)),
+        { status: 201 },
+      )
+    }),
+  ),
+
+  http.post(
+    `${A}/labs/:id/teams/auto-assign`,
+    authed(({ params, user }) => {
+      const found = teacherTeamLab(params.id, user.id)
+      if (found instanceof Response) return found
+      const max = found.lab.max_team_size ?? 0
+      const teams = cdb.teams.filter((tm) => tm.lab_id === found.lab.id)
+      for (const id of unassignedIds(found.course.id, found.lab.id)) {
+        const open = teams.filter((tm) => !tm.locked && tm.member_ids.length < max)
+        if (!open.length) break
+        open.sort((a, b) => a.member_ids.length - b.member_ids.length)[0]!.member_ids.push(id)
+      }
+      return HttpResponse.json(teams.map((tm) => toTeam(tm, user.id, true)))
+    }),
+  ),
+
   http.post(
     `${A}/labs/:id/teams`,
     authed(async ({ params, request, user }) => {
       const found = labOf(params.id)
       if (!found) return notFound()
-      if (roleIn(found.course, user.id) !== 'estudiante') return forbidden()
+      const role = roleIn(found.course, user.id)
+      if (!role) return forbidden()
       if (found.lab.team_mode !== 'team')
-        return validation({ name: 'Este laboratorio es individual.' })
-      const { name } = (await request.json()) as { name?: string }
-      if (!name?.trim()) return validation({ name: 'Escribe el nombre del equipo.' })
+        return err(409, 'not_team_lab', 'Este laboratorio es individual.')
+      const body = (await request.json()) as { name?: string; member_ids?: string[] }
+      const name = body.name?.trim()
+      if (!name) return validation({ name: 'Escribe el nombre del equipo.' })
+      if (role === 'docente') return createTeacherTeam(found, name, body.member_ids ?? [], user.id)
+      if (body.member_ids?.length) return forbidden()
       if (myTeam(found.lab.id, user.id)) return err(409, 'already_in_team', 'Ya tienes equipo.')
-      const team: MTeam = {
-        id: newId('tm'),
-        lab_id: found.lab.id,
-        name: name.trim(),
-        join_code: genCode(),
-        locked: false,
-        member_ids: [user.id],
-      }
+      const team = newTeam(found.lab.id, name, [user.id])
       cdb.teams.push(team)
       return HttpResponse.json(toTeam(team, user.id, false), { status: 201 })
+    }),
+  ),
+
+  http.patch(
+    `${A}/teams/:id`,
+    authed(async ({ params, request, user }) => {
+      const team = teacherTeam(params.id, user.id)
+      if (team instanceof Response) return team
+      const name = ((await request.json()) as { name?: string }).name?.trim()
+      if (!name) return validation({ name: 'Escribe el nombre del equipo.' })
+      if (teamNameTaken(team.lab_id, name, team.id))
+        return err(409, 'team_name_taken', 'Nombre repetido.')
+      team.name = name
+      return HttpResponse.json(toTeam(team, user.id, true))
+    }),
+  ),
+
+  http.delete(
+    `${A}/teams/:id`,
+    authed(({ params, user }) => {
+      const team = teacherTeam(params.id, user.id)
+      if (team instanceof Response) return team
+      if (cdb.submissions.some((s) => s.team_id === team.id))
+        return err(409, 'team_has_submissions', 'El equipo tiene entregas.')
+      cdb.teams = cdb.teams.filter((tm) => tm !== team)
+      return noContent()
     }),
   ),
 
@@ -653,6 +801,8 @@ export const courseHandlers = [
       const invalid = ids.filter((id) => roleIn(found.course, id) !== 'estudiante')
       if (invalid.length)
         return validation({ members: 'Hay usuarios que no son estudiantes del curso.' })
+      const max = found.lab.max_team_size ?? 0
+      if (new Set(ids).size > max) return validation({ members: `Máximo ${max} integrantes.` })
       for (const t of cdb.teams) {
         if (t.lab_id === team.lab_id && t !== team)
           t.member_ids = t.member_ids.filter((x) => !ids.includes(x))
@@ -662,16 +812,16 @@ export const courseHandlers = [
     }),
   ),
 
-  http.post(
-    `${A}/teams/:id/lock`,
-    authed(({ params, user }) => {
-      const team = cdb.teams.find((t) => t.id === params.id)
-      const found = team ? labOf(team.lab_id) : null
-      if (!team || !found) return notFound()
-      if (found.course.owner_id !== user.id) return forbidden()
-      team.locked = true
-      return HttpResponse.json(toTeam(team, user.id, true))
-    }),
+  ...(['lock', 'unlock'] as const).map((action) =>
+    http.post(
+      `${A}/teams/:id/${action}`,
+      authed(({ params, user }) => {
+        const team = teacherTeam(params.id, user.id)
+        if (team instanceof Response) return team
+        team.locked = action === 'lock'
+        return HttpResponse.json(toTeam(team, user.id, true))
+      }),
+    ),
   ),
 
   // ---- Entregas ----

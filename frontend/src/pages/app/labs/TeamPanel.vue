@@ -53,7 +53,7 @@ async function create() {
     const res = await teamsApi.create(props.lab.id, name.value.trim())
     name.value = ''
     await load()
-    status.value = t('teams.created', { code: res.join_code })
+    status.value = t('teams.created', { code: res.join_code ?? '' })
   } catch (e) {
     error.value = courseErrorMessage(e)
   } finally {
