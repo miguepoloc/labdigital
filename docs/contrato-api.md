@@ -142,6 +142,23 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
   `ld_refresh`): se pone en login/refresh y se borra en logout o al revocar. Sólo evita que páginas públicas pidan
   `/me` sin sesión; nunca se usa para autorizar.
 
+### 6.2 Notificaciones por correo (worker del outbox)
+
+Ningún endpoint envía correo directamente: el evento se registra en el outbox en la misma transacción que el cambio
+y el worker manda el correo (al menos una vez; reintentos con espera exponencial). Plantillas en español, trato de tú,
+maquetación común `backend/commons/application/email_layout.py`.
+
+- Cuenta (`identity`): verificar correo, restablecer contraseña, «ya tienes una cuenta».
+- **Solicitud de inscripción** (LD-17): `POST /courses/join` que deja la membresía en `pending` (nueva, o de nuevo tras
+  `rejected`/`removed`; repetir estando `pending` o `active` no avisa) ⇒ correo a cada docente activo del curso.
+  Asunto `Nueva solicitud en <curso> — LabDigital GIDEAM`; cuerpo `<nombre> (<correo>) pidió unirse a <curso>
+  (<periodo>).` + pendientes del curso; botón «Revisar solicitudes» → `{PUBLIC_BASE_URL}/app/cursos/<course_id>`.
+  **Anti-spam**: como mucho un correo por docente y curso cada 10 min (`course_join_notices`); lo que llegue dentro de
+  la ventana no genera correo propio y cuenta en el «Tienes N solicitudes pendientes» del siguiente. Si al procesarse
+  la solicitud ya no está pendiente (aprobada/rechazada) o el curso está archivado, no se envía.
+- **Aprobación** (LD-17): `approve` que deja la membresía en `active` ⇒ correo al estudiante `Ya estás en <curso> —
+  LabDigital GIDEAM` con botón «Ir al curso» (misma URL). Rechazar o retirar no avisa.
+
 ## 7. API de integración del módulo FPGA (`window.JGFPGA`, PR a mcangen/JG-FPGA)
 
 ```js

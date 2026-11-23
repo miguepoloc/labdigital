@@ -1,5 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy import orm as sa_orm
+from sqlalchemy.dialects import postgresql
 import sqlalchemy.exc
 import sqlalchemy.orm.exc
 
@@ -234,6 +235,41 @@ class DefaultMembershipRepository(repositories.Repository[aggregate.Membership])
         row = self._session.get(orm.MembershipOrm, id.value)
         if row is not None:
             self._session.delete(row)
+
+
+class JoinNoticeRepository:
+    """Anti-spam de los avisos de solicitudes (`course_join_notices`). No es un agregado: es
+    estado técnico del worker, sin eventos ni versión."""
+
+    def __init__(self, session: sa_orm.Session) -> None:
+        self._session = session
+
+    def claim(
+        self,
+        course_id: teaching_value_objects.CourseId,
+        recipient_ids: list[teaching_value_objects.UserRef],
+        *,
+        now: int,
+        cutoff: int,
+    ) -> set[str]:
+        """Reserva el aviso para los docentes cuyo último correo de este curso es anterior a
+        `cutoff` (o que nunca recibieron uno) y les pone `last_sent_at = now`. Atómico
+        (`INSERT … ON CONFLICT DO UPDATE … WHERE`): dos workers no avisan dos veces."""
+        if not recipient_ids:
+            return set()
+        table = orm.JoinNoticeOrm
+        insert = postgresql.insert(table).values(
+            [
+                {"course_id": course_id.value, "recipient_id": r.value, "last_sent_at": now}
+                for r in recipient_ids
+            ]
+        )
+        upsert = insert.on_conflict_do_update(
+            index_elements=[table.course_id, table.recipient_id],
+            set_={"last_sent_at": insert.excluded.last_sent_at},
+            where=table.last_sent_at <= cutoff,
+        ).returning(table.recipient_id)
+        return {str(r) for r in self._session.scalars(upsert)}
 
 
 unit_of_work.register_repo(aggregate.Course, DefaultCourseRepository)
