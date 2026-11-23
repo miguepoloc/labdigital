@@ -135,13 +135,18 @@ def test_stale_team_version_loses_the_last_slot(db: sa.Engine) -> None:
 
 
 def _submission(
-    lab_id: str, course_id: str, who: tvo.UserRef, version_id: uuid.UUID, project_id: uuid.UUID
+    lab_id: str,
+    course_id: str,
+    who: tvo.UserRef,
+    version_id: uuid.UUID,
+    project_id: uuid.UUID,
+    team_id: tvo.TeamId | None = None,
 ) -> subs_aggregate.Submission:
     return subs_aggregate.Submission.submit(
         lab_id=tvo.LabId(value=uuid.UUID(lab_id)),
         course_id=tvo.CourseId(value=uuid.UUID(course_id)),
         submitter_id=who,
-        team_id=None,
+        team_id=team_id,
         member_ids=[who],
         previous=None,
         allow_resubmission=False,
@@ -179,6 +184,41 @@ def test_attempt_is_unique_and_frozen_version_cannot_be_deleted(db: sa.Engine) -
         )
     with pytest.raises(sa.exc.IntegrityError), db.begin() as conn:
         conn.execute(sa.text("DELETE FROM project_versions WHERE id = :v"), {"v": vid})
+
+
+def test_team_with_submissions_cannot_be_deleted_even_skipping_the_check(db: sa.Engine) -> None:
+    uow = unit_of_work.build()
+    teacher, course_id, (a,) = _course_with_students(uow, 1)
+    lab_id = _lab(uow, course_id, teacher, team_mode="team", max_team_size=2)
+    team = labs.create_team_by_teacher(
+        uow=uow, lab_id=lab_id, name="Pareja 1", member_ids=[str(a.user_id)], actor=_ACTOR
+    )
+    project = projects.create_project(
+        uow=uow,
+        owner_id=str(a.user_id),
+        input_dto=projects_dto.CreateProjectInputDTO(
+            name="P", module="fpga", content=unit_projects.content("x")
+        ),
+    )
+    frozen = projects.freeze_version(
+        uow=uow, owner_id=str(a.user_id), project_id=project.id, version_id=None
+    )
+    team_id = tvo.TeamId(value=uuid.UUID(team.id))
+    with uow.transaction():
+        subs_repository.DefaultSubmissionRepository(uow.session).add(
+            _submission(
+                lab_id,
+                course_id,
+                a.user_id,
+                uuid.UUID(frozen.version_id),
+                uuid.UUID(project.id),
+                team_id=team_id,
+            )
+        )
+    # Sin pasar por el orquestador (como una entrega que llega a la vez): la FK lo impide.
+    with pytest.raises(labs_exceptions.TeamHasSubmissionsError):
+        labs.delete_team(uow=uow, team_id=team.id, actor=_ACTOR)
+    assert labs.get_team(uow=uow, team_id=team.id).member_ids() == [str(a.user_id)]
 
 
 def test_join_code_collision_is_retried(db: sa.Engine, monkeypatch: pytest.MonkeyPatch) -> None:

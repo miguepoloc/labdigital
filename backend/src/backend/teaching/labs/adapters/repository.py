@@ -198,9 +198,20 @@ class DefaultTeamRepository(repositories.Repository[aggregate.Team]):
         repository_helpers.publish_events(self._session, team)
 
     def delete(self, id: teaching_value_objects.TeamId) -> None:  # noqa: A002
+        """Los integrantes caen en cascada. Una entrega del equipo (FK `RESTRICT`, también
+        si llega a la vez) ⇒ `TeamHasSubmissionsError`."""
         row = self._session.get(orm.TeamOrm, id.value)
-        if row is not None:
-            self._session.delete(row)
+        if row is None:
+            return
+        try:
+            with self._session.begin_nested():
+                self._session.execute(
+                    sa.delete(orm.TeamMemberOrm).where(orm.TeamMemberOrm.team_id == id.value)
+                )
+                self._session.delete(row)
+                self._session.flush()
+        except sqlalchemy.exc.IntegrityError as exc:
+            raise exceptions.TeamHasSubmissionsError() from exc
 
     def _sync_members(self, team: aggregate.Team) -> None:
         """Reescribe los integrantes. La unicidad `(lab_id, user_id)` traduce "ya está en

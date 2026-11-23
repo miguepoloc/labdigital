@@ -133,8 +133,14 @@ class Team(aggregates.AggregateRoot[teaching_value_objects.TeamId]):
         lab_id: teaching_value_objects.LabId,
         course_id: teaching_value_objects.CourseId,
         name: value_objects.TeamName,
-        creator: teaching_value_objects.UserRef,
+        members: list[teaching_value_objects.UserRef],
+        max_size: int,
     ) -> Self:
+        """El estudiante crea su equipo con él dentro; el docente, vacío o con los
+        integrantes que elija (nunca él mismo: lo valida el orquestador)."""
+        unique = list(dict.fromkeys(members))
+        if len(unique) > max_size:
+            raise exceptions.TeamTooLargeError(max_size)
         now = base_value_objects.PosixTime.now()
         team = cls(
             id=teaching_value_objects.TeamId.new(),
@@ -142,12 +148,22 @@ class Team(aggregates.AggregateRoot[teaching_value_objects.TeamId]):
             course_id=course_id,
             name=name,
             join_code=value_objects.TeamJoinCode.new(),
-            members=[creator],
+            members=unique,
             created_at=now,
             updated_at=now,
         )
         team._changed()
         return team
+
+    def rename(self, name: value_objects.TeamName) -> bool:
+        if name == self.name:
+            return False
+        self.name = name
+        self.touch()
+        return True
+
+    def free_slots(self, max_size: int) -> int:
+        return max(max_size - len(self.members), 0)
 
     def has_member(self, user_id: teaching_value_objects.UserRef) -> bool:
         return user_id in self.members
@@ -184,6 +200,17 @@ class Team(aggregates.AggregateRoot[teaching_value_objects.TeamId]):
         if self.has_member(user_id):
             self.members = [m for m in self.members if m != user_id]
             self._changed()
+
+    def add_member_by_teacher(
+        self, user_id: teaching_value_objects.UserRef, *, max_size: int
+    ) -> None:
+        """Reparto automático del docente: ignora el bloqueo, respeta el tamaño."""
+        if self.has_member(user_id):
+            return
+        if len(self.members) >= max_size:
+            raise exceptions.TeamFullError(max_size)
+        self.members = [*self.members, user_id]
+        self._changed()
 
     def set_locked(self, locked: bool) -> bool:
         if self.locked == locked:

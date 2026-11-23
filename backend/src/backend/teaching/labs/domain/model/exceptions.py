@@ -65,6 +65,33 @@ class AlreadyInTeamError(exceptions.ConflictError):
         super().__init__("Ya estás en un equipo de este laboratorio.", code="already_in_team")
 
 
+class StudentsAlreadyInTeamError(exceptions.ConflictError):
+    """Mismo código que `AlreadyInTeamError`, pero dicho al docente y con los ids."""
+
+    def __init__(self, member_ids: list[str]) -> None:
+        super().__init__(
+            "Alguno de los estudiantes ya está en otro equipo de este laboratorio.",
+            code="already_in_team",
+            details={"members": member_ids},
+        )
+
+
+class TeamNameTakenError(exceptions.ConflictError):
+    def __init__(self, name: str) -> None:
+        super().__init__(
+            f"Ya hay un equipo llamado «{name}» en este laboratorio.",
+            code="team_name_taken",
+            details={"field": "name"},
+        )
+
+
+class TeamHasSubmissionsError(exceptions.ConflictError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Este equipo ya tiene entregas: no se puede eliminar.", code="team_has_submissions"
+        )
+
+
 class NotInTeamError(exceptions.ConflictError):
     def __init__(self) -> None:
         super().__init__("No perteneces a este equipo.", code="not_in_team")

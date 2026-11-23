@@ -34,7 +34,19 @@ class LabBody(base_dto.BaseDTO):
 
 
 class TeamBody(base_dto.BaseDTO):
+    """Estudiante: `{name}`. Docente: `{name, member_ids?}` (LD-18)."""
+
     name: str = pydantic.Field(max_length=200)
+    member_ids: list[str] | None = pydantic.Field(default=None, max_length=50)
+
+
+class RenameTeamBody(base_dto.BaseDTO):
+    name: str = pydantic.Field(max_length=200)
+
+
+class BulkTeamsBody(base_dto.BaseDTO):
+    count: int = pydantic.Field(ge=1, le=60)
+    prefix: str = pydantic.Field(default="Pareja", min_length=1, max_length=60)
 
 
 class CodeBody(base_dto.BaseDTO):
@@ -98,12 +110,71 @@ def create_team(
     lab_id: str,
     body: TeamBody,
     viewer: deps.ViewerDep,
+    actor: deps.ActorDep,
     uow: deps.UowDep,
     directory: deps.DirectoryDep,
 ) -> dto.TeamViewOutputDTO:
-    """Devuelve el `Team` completo (incluye `join_code`, contrato §4)."""
+    """Devuelve el `Team` completo (incluye `join_code`, contrato §4). El docente crea un
+    equipo sin entrar él, con `member_ids` opcionales; el estudiante, el suyo."""
     return teams_orchestrator.create_team(
-        uow=uow, viewer=viewer, directory=directory, lab_id=lab_id, name=body.name
+        uow=uow,
+        viewer=viewer,
+        actor=actor,
+        directory=directory,
+        lab_id=lab_id,
+        name=body.name,
+        member_ids=body.member_ids,
+    )
+
+
+@router.post(
+    "/labs/{lab_id}/teams/bulk",
+    response_model=list[dto.TeamViewOutputDTO],
+    status_code=status.HTTP_201_CREATED,
+)
+def create_teams_bulk(
+    lab_id: str,
+    body: BulkTeamsBody,
+    viewer: deps.ViewerDep,
+    actor: deps.ActorDep,
+    uow: deps.UowDep,
+    directory: deps.DirectoryDep,
+) -> list[dto.TeamViewOutputDTO]:
+    """Docente: crea «<prefix> 1..count» vacíos, saltando nombres ya usados; devuelve los
+    creados."""
+    return teams_orchestrator.create_teams_bulk(
+        uow=uow,
+        viewer=viewer,
+        actor=actor,
+        directory=directory,
+        lab_id=lab_id,
+        prefix=body.prefix,
+        count=body.count,
+    )
+
+
+@router.get("/labs/{lab_id}/teams/unassigned", response_model=list[dto.PersonOutputDTO])
+def list_unassigned(
+    lab_id: str, viewer: deps.ViewerDep, uow: deps.UowDep, directory: deps.DirectoryDep
+) -> list[dto.PersonOutputDTO]:
+    """Docente: estudiantes activos del curso sin equipo en este lab."""
+    return teams_orchestrator.list_unassigned(
+        uow=uow, viewer=viewer, directory=directory, lab_id=lab_id
+    )
+
+
+@router.post("/labs/{lab_id}/teams/auto-assign", response_model=list[dto.TeamViewOutputDTO])
+def auto_assign(
+    lab_id: str,
+    viewer: deps.ViewerDep,
+    actor: deps.ActorDep,
+    uow: deps.UowDep,
+    directory: deps.DirectoryDep,
+) -> list[dto.TeamViewOutputDTO]:
+    """Docente: reparte al azar a quienes no tienen equipo entre los equipos no fijados
+    con hueco. Devuelve todos los equipos del lab."""
+    return teams_orchestrator.auto_assign(
+        uow=uow, viewer=viewer, actor=actor, directory=directory, lab_id=lab_id
     )
 
 
@@ -127,6 +198,29 @@ def leave_team(
     return teams_orchestrator.leave_team(
         uow=uow, viewer=viewer, directory=directory, team_id=team_id
     )
+
+
+@router.patch("/teams/{team_id}", response_model=dto.TeamViewOutputDTO)
+def rename_team(
+    team_id: str,
+    body: RenameTeamBody,
+    viewer: deps.ViewerDep,
+    actor: deps.ActorDep,
+    uow: deps.UowDep,
+    directory: deps.DirectoryDep,
+) -> dto.TeamViewOutputDTO:
+    return teams_orchestrator.rename_team(
+        uow=uow, viewer=viewer, actor=actor, directory=directory, team_id=team_id, name=body.name
+    )
+
+
+@router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_team(
+    team_id: str, viewer: deps.ViewerDep, actor: deps.ActorDep, uow: deps.UowDep
+) -> fastapi.Response:
+    """Docente: sólo sin entregas (409 `team_has_submissions`)."""
+    teams_orchestrator.delete_team(uow=uow, viewer=viewer, actor=actor, team_id=team_id)
+    return fastapi.Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.put("/teams/{team_id}/members", response_model=dto.TeamViewOutputDTO)

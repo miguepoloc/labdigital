@@ -166,7 +166,8 @@ def test_team_size_lock_and_membership() -> None:
         lab_id=tvo.LabId.new(),
         course_id=tvo.CourseId.new(),
         name=labs_vo.TeamName(value="LED"),
-        creator=ME,
+        members=[ME],
+        max_size=2,
     )
     team.join(OTHER, max_size=2)
     with pytest.raises(labs_exc.TeamFullError):
@@ -178,6 +179,48 @@ def test_team_size_lock_and_membership() -> None:
     assert team.members == [ME]
     with pytest.raises(labs_exc.TeamTooLargeError):
         team.set_members([ME, OTHER, tvo.UserRef(value=uuid.uuid4())], max_size=2)
+
+
+def _teacher_team(members: list[tvo.UserRef], max_size: int = 2) -> labs.Team:
+    return labs.Team.create(
+        lab_id=tvo.LabId.new(),
+        course_id=tvo.CourseId.new(),
+        name=labs_vo.TeamName(value="Pareja 1"),
+        members=members,
+        max_size=max_size,
+    )
+
+
+def test_teacher_team_creation_respects_max_size_and_dedups() -> None:
+    empty = _teacher_team([])
+    assert empty.members == []
+    assert empty.free_slots(2) == 2
+    pair = _teacher_team([ME, OTHER, ME])
+    assert pair.members == [ME, OTHER]
+    assert pair.free_slots(2) == 0
+    with pytest.raises(labs_exc.TeamTooLargeError):
+        _teacher_team([ME, OTHER, tvo.UserRef(value=uuid.uuid4())])
+
+
+def test_teacher_rename_and_add_member_ignore_lock() -> None:
+    team = _teacher_team([ME])
+    team.set_locked(True)
+    assert team.rename(labs_vo.TeamName(value="  Pareja   7 ")) is True
+    assert team.name.value == "Pareja 7"
+    assert team.rename(labs_vo.TeamName(value="Pareja 7")) is False
+    team.add_member_by_teacher(OTHER, max_size=2)
+    team.add_member_by_teacher(OTHER, max_size=2)  # idempotente
+    assert team.members == [ME, OTHER]
+    with pytest.raises(labs_exc.TeamFullError):
+        team.add_member_by_teacher(tvo.UserRef(value=uuid.uuid4()), max_size=2)
+
+
+def test_team_conflict_codes() -> None:
+    assert labs_exc.TeamHasSubmissionsError().code == "team_has_submissions"
+    assert labs_exc.TeamNameTakenError("Pareja 1").code == "team_name_taken"
+    taken = labs_exc.StudentsAlreadyInTeamError(["u1"])
+    assert taken.code == "already_in_team"
+    assert taken.details == {"members": ["u1"]}
 
 
 # -- Entregas ---------------------------------------------------------------------

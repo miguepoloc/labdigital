@@ -66,7 +66,8 @@ deadline_policy: strict|late_marked|none, team_mode: individual|team, max_team_s
 min?, max?, decimals?, pass_mark?}, allow_resubmission}` · `GET/PATCH /labs/{id}` · `POST /labs/{id}/publish`.
 
 Equipos: `GET /labs/{id}/teams` · `POST /labs/{id}/teams {name}` → `{join_code}` · `POST /labs/{id}/teams/join {code}` ·
-`POST /teams/{id}/leave` · docente: `PUT /teams/{id}/members [uid]`, `POST /teams/{id}/lock`.
+`POST /teams/{id}/leave` · docente: `PUT /teams/{id}/members [uid]`, `POST /teams/{id}/lock`
+(y las rutas de docente de LD-18, §6.1 «Equipos del docente»).
 
 Entregas: `POST /labs/{id}/submissions {project_id, version_id?, file_ids:[...]}` (congela versión; marca `is_late`;
 rechaza si `strict` y pasó `due_at`) · `GET /labs/{id}/submissions` (docente: todas; estudiante: las suyas/equipo) ·
@@ -136,6 +137,31 @@ Códigos fijos usados por el frontend: `invalid_credentials`, `email_not_verifie
   `not_in_team`, `not_team_lab`. `GET /labs/{id}/submissions` devuelve `Submission` **sin `content`** (con
   `files` y `reviews`, para el historial de intentos). `Submission` incluye además `project_name`. `POST /labs/{id}/teams` devuelve el `Team` completo. `POST /files` es multipart con
   campos `file` y `kind`; `PUT /teams/{id}/members` recibe una lista JSON de ids de usuario (`["uuid", …]`).
+- **Equipos del docente** (LD-18). Todas exigen gestionar el curso (docente o admin; si no ⇒ 403 `forbidden`, sin
+  relación con el curso ⇒ 404), curso no archivado (409 `course_archived`) y lab en equipo (409 `not_team_lab`).
+  Todas las mutaciones quedan en el registro de auditoría (`team_created`, `team_renamed`, `team_deleted`,
+  `team_members_set`, `team_locked`/`team_unlocked`).
+  - `POST /labs/{id}/teams {name, member_ids?}`: si quien llama gestiona el lab crea un equipo **sin** añadirse él,
+    vacío o con `member_ids` (estudiantes activos del curso ⇒ si no 422 `validation_error` con `details.fields.members`;
+    como mucho `max_team_size` ⇒ si no 422 igual; ninguno en otro equipo del lab ⇒ si no 409 `already_in_team` con
+    `details.members: [uid]`). Un estudiante sigue creando el suyo y entrando; si envía `member_ids` no vacío ⇒ 403.
+    → 201 `Team`.
+  - `POST /labs/{id}/teams/bulk {count (1–60), prefix = "Pareja"}` → 201 `[Team]` con los creados: equipos vacíos
+    «`prefix` 1»…«`prefix` N»; los nombres que ya existen se saltan.
+  - `GET /labs/{id}/teams/unassigned` → `[{id, full_name}]`: estudiantes activos del curso sin equipo en el lab,
+    ordenados por nombre.
+  - `POST /labs/{id}/teams/auto-assign` (cuerpo vacío) → `[Team]` (todos los del lab): reparte al azar a quienes no
+    tienen equipo entre los equipos **no fijados** con hueco, llenando primero los que tienen menos integrantes;
+    quien no quepa sigue sin equipo.
+  - `PATCH /teams/{id} {name}` → `Team` (renombrar).
+  - `DELETE /teams/{id}` → 204; sus integrantes quedan sin equipo. Si el equipo tiene entregas ⇒ 409
+    `team_has_submissions` (el historial no se toca).
+  - **Mover** a un estudiante: `PUT /teams/{destino}/members` con la lista nueva; si estaba en otro equipo del lab
+    sale de él en la misma transacción (aunque alguno esté fijado). Quitar = `PUT` sin él. Cambiar integrantes de un
+    equipo con entregas está permitido: cada entrega conserva su foto de integrantes (`Submission.members`).
+  - Nombres únicos por lab sin distinguir mayúsculas al crear (docente) y renombrar ⇒ 409 `team_name_taken`
+    (`details.field = "name"`).
+  - Códigos 409 nuevos: `team_name_taken`, `team_has_submissions`.
 - **Sesión en cada petición privada**: toda ruta autenticada (salvo `GET /auth/verify`) comprueba en BD que `sid`
   sigue activa y que `ver` coincide; un access robado muere al cerrar sesión, revocar, cambiar contraseña o desactivar.
 - **Cookie indicadora** `ld_session=1` (NO HttpOnly, `Secure; SameSite=Lax; Path=/labdigital/`, misma vida que
