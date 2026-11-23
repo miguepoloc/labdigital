@@ -7,6 +7,7 @@ from backend.teaching.commons import value_objects as teaching_value_objects
 
 TEAM_CODE_LENGTH = 6
 MAX_TEAM_SIZE = 10
+MAX_BULK_TEAMS = 60
 _TITLE_MAX = 200
 _STATEMENT_MAX = 200_000
 _TEAM_NAME_MAX = 80
@@ -152,6 +153,9 @@ class AuditAction(enum.StrEnum):
     LAB_CREATED = enum.auto()
     LAB_UPDATED = enum.auto()
     LAB_PUBLISHED = enum.auto()
+    TEAM_CREATED = enum.auto()
+    TEAM_RENAMED = enum.auto()
+    TEAM_DELETED = enum.auto()
     TEAM_MEMBERS_SET = enum.auto()
     TEAM_LOCKED = enum.auto()
     TEAM_UNLOCKED = enum.auto()

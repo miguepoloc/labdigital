@@ -2,6 +2,7 @@
 qué: las llaman los orquestadores de `teaching.services`, que ya comprobaron la relación con
 el curso (`courses.get_access`). Cada una es la única puerta a `Lab`/`Team`."""
 
+import random
 import typing
 from typing import Any
 import uuid
@@ -15,6 +16,8 @@ from backend.teaching.labs.adapters import repository
 from backend.teaching.labs.domain.model import aggregate, exceptions, value_objects
 from backend.teaching.labs.services import dto
 
+# Reparto automático de equipos: no es criptográfico, pero así no depende de la semilla global.
+_RANDOM = random.SystemRandom()
 # --------------------------------------------------------------------------------------
 # Labs
 # --------------------------------------------------------------------------------------
@@ -172,7 +175,7 @@ def create_team(
     user = _user(user_id)
     with uow.transaction():
         lab = uow.repo(aggregate.Lab).get(_lab_id(lab_id))
-        lab.ensure_team_lab()
+        max_size = lab.ensure_team_lab()
         repo = _teams(uow)
         if repo.find_for_member(lab.id, user) is not None:
             raise exceptions.AlreadyInTeamError()
@@ -180,10 +183,166 @@ def create_team(
             lab_id=lab.id,
             course_id=lab.course_id,
             name=value_objects.TeamName(value=name),
-            creator=user,
+            members=[user],
+            max_size=max_size,
         )
         repo.add(team)
     return dto.TeamOutputDTO.from_entity(team)
+
+
+def create_team_by_teacher(
+    *,
+    uow: unit_of_work.UnitOfWork,
+    lab_id: str,
+    name: str,
+    member_ids: list[str],
+    actor: audit.Actor,
+) -> dto.TeamOutputDTO:
+    """Equipo del docente (vacío o con integrantes que aún no tienen equipo en el lab).
+    Nombre repetido en el lab (sin distinguir mayúsculas) ⇒ 409 `team_name_taken`;
+    alguien ya en otro equipo ⇒ 409 `already_in_team` con `details.members`. Que sean
+    estudiantes activos lo valida el orquestador."""
+    members = [_user(m) for m in dict.fromkeys(member_ids)]
+    team_name = value_objects.TeamName(value=name)
+    with uow.transaction():
+        lab = uow.repo(aggregate.Lab).get(_lab_id(lab_id))
+        max_size = lab.ensure_team_lab()
+        repo = _teams(uow)
+        _ensure_name_free(repo.list_for_lab(lab.id), team_name)
+        taken = [str(m) for m in members if repo.find_for_member(lab.id, m) is not None]
+        if taken:
+            raise exceptions.StudentsAlreadyInTeamError(taken)
+        team = aggregate.Team.create(
+            lab_id=lab.id,
+            course_id=lab.course_id,
+            name=team_name,
+            members=members,
+            max_size=max_size,
+        )
+        repo.add(team)
+        uow.audit.add(_created_entry(team, actor))
+    return dto.TeamOutputDTO.from_entity(team)
+
+
+def create_teams_bulk(
+    *,
+    uow: unit_of_work.UnitOfWork,
+    lab_id: str,
+    prefix: str,
+    count: int,
+    actor: audit.Actor,
+) -> list[dto.TeamOutputDTO]:
+    """Crea los equipos vacíos «<prefijo> 1»…«<prefijo> N» que falten (los nombres que ya
+    existen se saltan). Devuelve sólo los creados."""
+    if not 1 <= count <= value_objects.MAX_BULK_TEAMS:
+        raise commons_exceptions.ValidationError(
+            f"Se pueden crear entre 1 y {value_objects.MAX_BULK_TEAMS} equipos a la vez.",
+            code="validation_error",
+            details={"fields": {"count": f"Entre 1 y {value_objects.MAX_BULK_TEAMS}."}},
+        )
+    names = [value_objects.TeamName(value=f"{prefix} {i}") for i in range(1, count + 1)]
+    created: list[aggregate.Team] = []
+    with uow.transaction():
+        lab = uow.repo(aggregate.Lab).get(_lab_id(lab_id))
+        max_size = lab.ensure_team_lab()
+        repo = _teams(uow)
+        existing = {_name_key(t.name) for t in repo.list_for_lab(lab.id)}
+        for team_name in names:
+            if _name_key(team_name) in existing:
+                continue
+            team = aggregate.Team.create(
+                lab_id=lab.id,
+                course_id=lab.course_id,
+                name=team_name,
+                members=[],
+                max_size=max_size,
+            )
+            repo.add(team)
+            uow.audit.add(_created_entry(team, actor))
+            existing.add(_name_key(team_name))
+            created.append(team)
+    return [dto.TeamOutputDTO.from_entity(t) for t in created]
+
+
+def rename_team(
+    *, uow: unit_of_work.UnitOfWork, team_id: str, name: str, actor: audit.Actor
+) -> dto.TeamOutputDTO:
+    team_name = value_objects.TeamName(value=name)
+    with uow.transaction():
+        repo = _teams(uow)
+        team = repo.get(_team_id(team_id))
+        others = [t for t in repo.list_for_lab(team.lab_id) if t.id != team.id]
+        _ensure_name_free(others, team_name)
+        previous = team.name.value
+        if team.rename(team_name):
+            repo.update(team)
+            uow.audit.add(
+                _team_entry(
+                    team,
+                    value_objects.AuditAction.TEAM_RENAMED,
+                    actor,
+                    {"from": previous, "name": team.name.value},
+                )
+            )
+    return dto.TeamOutputDTO.from_entity(team)
+
+
+def delete_team(*, uow: unit_of_work.UnitOfWork, team_id: str, actor: audit.Actor) -> None:
+    """Sus integrantes quedan sin equipo. Con entregas ⇒ 409 `team_has_submissions` (lo
+    comprueba el orquestador; la FK `RESTRICT` de `submissions.team_id` lo garantiza)."""
+    with uow.transaction():
+        repo = _teams(uow)
+        team = repo.get(_team_id(team_id))
+        repo.delete(team.id)
+        uow.audit.add(
+            _team_entry(
+                team,
+                value_objects.AuditAction.TEAM_DELETED,
+                actor,
+                {"name": team.name.value, "members": [str(m) for m in team.members]},
+            )
+        )
+
+
+def auto_assign(
+    *,
+    uow: unit_of_work.UnitOfWork,
+    lab_id: str,
+    student_ids: list[str],
+    actor: audit.Actor,
+) -> list[dto.TeamOutputDTO]:
+    """Reparte al azar a `student_ids` que aún no tengan equipo entre los equipos NO
+    bloqueados con hueco, llenando primero los que tienen menos integrantes. Quien no
+    quepa sigue sin equipo. Devuelve todos los equipos del lab."""
+    with uow.transaction():
+        lab = uow.repo(aggregate.Lab).get(_lab_id(lab_id))
+        max_size = lab.ensure_team_lab()
+        repo = _teams(uow)
+        teams = repo.list_for_lab(lab.id)
+        assigned = {m for t in teams for m in t.members}
+        pending = [u for u in (_user(s) for s in dict.fromkeys(student_ids)) if u not in assigned]
+        _RANDOM.shuffle(pending)
+        open_teams = [t for t in teams if not t.locked and t.free_slots(max_size)]
+        changed: dict[teaching_value_objects.TeamId, aggregate.Team] = {}
+        for student in pending:
+            if not open_teams:
+                break
+            target = min(open_teams, key=lambda t: len(t.members))
+            target.add_member_by_teacher(student, max_size=max_size)
+            changed[target.id] = target
+            if not target.free_slots(max_size):
+                open_teams.remove(target)
+        for team in changed.values():
+            repo.update(team)
+            uow.audit.add(
+                _team_entry(
+                    team,
+                    value_objects.AuditAction.TEAM_MEMBERS_SET,
+                    actor,
+                    {"members": [str(m) for m in team.members], "auto": True},
+                )
+            )
+    return [dto.TeamOutputDTO.from_entity(t) for t in teams]
 
 
 def join_team(
@@ -347,6 +506,24 @@ def _lab_entry(
         aggregate_type=value_objects.AuditAggregateType.LAB.value,
         aggregate_id=str(lab.id),
         changes={"course_id": str(lab.course_id)} | (changes or {}),
+    )
+
+
+def _name_key(name: value_objects.TeamName) -> str:
+    return name.value.casefold()
+
+
+def _ensure_name_free(teams: list[aggregate.Team], name: value_objects.TeamName) -> None:
+    if any(_name_key(t.name) == _name_key(name) for t in teams):
+        raise exceptions.TeamNameTakenError(name.value)
+
+
+def _created_entry(team: aggregate.Team, actor: audit.Actor) -> audit.AuditEntry:
+    return _team_entry(
+        team,
+        value_objects.AuditAction.TEAM_CREATED,
+        actor,
+        {"name": team.name.value, "members": [str(m) for m in team.members]},
     )
 
 

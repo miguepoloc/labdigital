@@ -156,7 +156,6 @@ def test_teams_size_one_per_lab_lock_and_teacher_reassignment(env: e2e.Env) -> N
         409,
         "not_team_lab",
     )
-    h.error(teacher.post(teams_url, json={"name": "Profe"}, headers=CSRF), 403, "forbidden")
     team = h.ok(a.post(teams_url, json={"name": "Los LED"}, headers=CSRF), 201)
     assert set(team) == {
         "id", "lab_id", "name", "locked", "members", "join_code", "created_at", "updated_at",

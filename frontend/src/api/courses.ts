@@ -144,15 +144,37 @@ export const labsApi = {
   publish: (id: UUID) => api.post<Lab>(`/labs/${enc(id)}/publish`),
 }
 
+/** `POST /labs/{id}/teams` como docente (LD-18): equipo sin el docente, vacío o con integrantes. */
+export interface TeamInput {
+  name: string
+  member_ids?: UUID[]
+}
+
+/** `POST /labs/{id}/teams/bulk`: crea «prefix 1..count» vacíos (salta nombres ya usados). */
+export interface BulkTeamsInput {
+  count: number
+  prefix?: string
+}
+
 export const teamsApi = {
   list: (labId: UUID) => api.get<Team[]>(`/labs/${enc(labId)}/teams`),
-  /** → `{join_code}` según el contrato; el mock devuelve además el `Team` completo. */
-  create: (labId: UUID, name: string) =>
-    api.post<Partial<Team> & { join_code: string }>(`/labs/${enc(labId)}/teams`, { name }),
+  /** Estudiante: crea su equipo y entra. Devuelve el `Team` completo (con `join_code`). */
+  create: (labId: UUID, name: string) => api.post<Team>(`/labs/${enc(labId)}/teams`, { name }),
   join: (labId: UUID, code: string) =>
     api.post<Team | undefined>(`/labs/${enc(labId)}/teams/join`, { code }),
   leave: (teamId: UUID) => api.post<void>(`/teams/${enc(teamId)}/leave`),
+  /** Docente: reemplaza integrantes; quien estuviera en otro equipo del lab se mueve aquí. */
   setMembers: (teamId: UUID, userIds: UUID[]) =>
     api.put<Team>(`/teams/${enc(teamId)}/members`, userIds),
   lock: (teamId: UUID) => api.post<Team | undefined>(`/teams/${enc(teamId)}/lock`),
+  unlock: (teamId: UUID) => api.post<Team | undefined>(`/teams/${enc(teamId)}/unlock`),
+  /** Docente (LD-18). */
+  createAsTeacher: (labId: UUID, body: TeamInput) =>
+    api.post<Team>(`/labs/${enc(labId)}/teams`, body),
+  bulk: (labId: UUID, body: BulkTeamsInput) =>
+    api.post<Team[]>(`/labs/${enc(labId)}/teams/bulk`, body),
+  unassigned: (labId: UUID) => api.get<TeamMember[]>(`/labs/${enc(labId)}/teams/unassigned`),
+  autoAssign: (labId: UUID) => api.post<Team[]>(`/labs/${enc(labId)}/teams/auto-assign`),
+  rename: (teamId: UUID, name: string) => api.patch<Team>(`/teams/${enc(teamId)}`, { name }),
+  remove: (teamId: UUID) => api.delete<void>(`/teams/${enc(teamId)}`),
 }
